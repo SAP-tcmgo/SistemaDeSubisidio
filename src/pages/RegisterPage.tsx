@@ -1,35 +1,84 @@
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Eye, EyeOff, UserPlus, Mail, Lock, User, Key } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff, Mail, Lock, Key, User } from 'lucide-react';
 import Logo from '../components/Logo';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '../components/ui/use-toast';
+import { auth, createUserWithEmailAndPassword } from '../firebase';
+import { db } from '../firebase';
+import { doc, setDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 
 const RegisterPage = () => {
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState('');
+  const [fullName, setFullName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !email || !password || !token) {
-      toast({
+
+    if (!email || !password || !token) {
+toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha todos os campos.",
         variant: "destructive",
       });
       return;
     }
-    
-    // Simulação de cadastro
-    toast({
-      title: "Cadastro realizado",
-      description: "Sua conta foi criada com sucesso!",
-    });
-    console.log('Register with:', { fullName, email, password, token });
+
+    try {
+      // 1. Verify Token
+      const tokensCollection = collection(db, "tokens");
+      const q = query(tokensCollection, where("token", "==", token), where("usado", "==", false));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: "Erro",
+          description: "Token inválido ou já utilizado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const tokenDoc = querySnapshot.docs[0];
+      const tokenId = tokenDoc.id;
+
+      // 2. Create User in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 3. Create User in 'usuarios' collection
+      const userId = user.uid;
+      const createdAt = new Date(); // Get current date and time
+      await setDoc(doc(db, "usuarios", userId), {
+        id: userId,
+        email: email,
+        fullName: fullName, // Include the full name
+        createdAt: createdAt // Include the creation date
+      });
+
+      // 4. Mark Token as Used
+      await updateDoc(doc(db, "tokens", tokenId), {
+        usado: true // Mark the token as used
+      });
+
+toast({
+        title: "Cadastro realizado",
+        description: "Cadastro realizado com sucesso!",
+        className: "bg-green-500 text-white",
+      });
+      navigate('/login');
+    } catch (error: any) {
+      console.error("Error signing up:", error);
+      toast({
+        title: "Erro ao cadastrar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -37,82 +86,15 @@ const RegisterPage = () => {
       <div className="auth-card w-full max-w-md">
         <div className="p-6 sm:p-8">
           <Logo />
-          
+
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Sistema de Análise de Subsídios
           </h1>
           <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
             Cadastrar-se
           </h2>
-          
+
           <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                Nome Completo
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="fullName"
-                  type="text"
-                  placeholder="Digite seu nome completo"
-                  className="input-field pl-10"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="input-group">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="Digite seu email"
-                  className="input-field pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="input-group">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Senha
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Digite sua senha"
-                  className="input-field pl-10 pr-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <div 
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
-                </div>
-              </div>
-            </div>
-            
             <div className="input-group">
               <label htmlFor="token" className="block text-sm font-medium text-gray-700">
                 Token
@@ -131,13 +113,79 @@ const RegisterPage = () => {
                 />
               </div>
             </div>
-            
+
+            <div className="input-group">
+              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                Nome Completo
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="fullName"
+                  type="text"
+                  placeholder="Digite seu nome completo"
+                  className="input-field pl-10"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="Digite seu email"
+                  className="input-field pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Senha
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Digite sua senha"
+                  className="input-field pl-10 pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <div
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
+              </div>
+            </div>
+
             <button type="submit" className="auth-button mt-6">
-              <UserPlus className="h-5 w-5" />
-              Cadastrar
+              Cadastrar-se
             </button>
           </form>
-          
+
           <div className="mt-6 text-center text-sm">
             <p className="text-gray-600">
               Já possui uma conta? <Link to="/login" className="link font-medium">Entrar</Link>

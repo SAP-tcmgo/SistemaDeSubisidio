@@ -1,6 +1,8 @@
 
 import type { Config } from "tailwindcss";
 
+// Consulte https://tailwindcss.com/docs/configuration para obter mais informações
+// Arquivo de configuração do Tailwind
 export default {
 	darkMode: ["class"],
 	content: [
