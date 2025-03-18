@@ -47,14 +47,14 @@ title: "Login realizado",
         description: "Login realizado com sucesso!",
         className: "bg-green-500 text-white",
       });
-      navigate('/index'); // Redirect to the index page
+      navigate('/dashboard'); // Redirect to the index page
     } catch (error: any) {
       toast({
         title: "Erro ao logar",
         description: error.message,
         variant: "destructive",
       });
-      console.error("Error logging in:", error);
+      console.error("Erro ao logar:", error);
     }
   };
 
