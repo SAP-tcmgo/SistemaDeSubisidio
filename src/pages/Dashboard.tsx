@@ -109,10 +109,15 @@ const Dashboard = () => {
             {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
 
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-gray-700">{userName}</span>
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700">
-              <User className="h-5 w-5" />
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center justify-center w-full">
+              <img src="/LogoTCMGO.svg" alt="Logo" className="h-14" />
+            </div>
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 mr-3">
+                <User className="h-5 w-5" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">{userName}</span>
             </div>
           </div>
         </header>

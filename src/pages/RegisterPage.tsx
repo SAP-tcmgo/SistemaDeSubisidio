@@ -29,7 +29,7 @@ toast({
     }
 
     try {
-      // 1. Verify Token
+      // 1. Verificar Token
       const tokensCollection = collection(db, "tokens");
       const q = query(tokensCollection, where("token", "==", token), where("usado", "==", false));
       const querySnapshot = await getDocs(q);
@@ -46,23 +46,23 @@ toast({
       const tokenDoc = querySnapshot.docs[0];
       const tokenId = tokenDoc.id;
 
-      // 2. Create User in Firebase Authentication
+      // 2. Criar Usuário na Autenticação Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 3. Create User in 'usuarios' collection
+      // 3. Criar Usuário na coleção 'usuarios'
       const userId = user.uid;
-      const createdAt = new Date(); // Get current date and time
+      const createdAt = new Date(); // Obter data e hora atuais
       await setDoc(doc(db, "usuarios", userId), {
         id: userId,
         email: email,
-        fullName: fullName, // Include the full name
-        createdAt: createdAt // Include the creation date
+        fullName: fullName, // Incluir o nome completo
+        createdAt: createdAt // Incluir a data de criação
       });
 
-      // 4. Mark Token as Used
+      // 4. Marcar Token como Usado
       await updateDoc(doc(db, "tokens", tokenId), {
-        usado: true // Mark the token as used
+        usado: false // Marcar o token como usado
       });
 
 toast({
