@@ -41,7 +41,7 @@ const marketingData = [
 const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [userName] = useState('ByeWind');
+  const [userName] = useState('SAP');
   const [activeItem, setActiveItem] = useState('dashboard');
 
   // Simular carregamento de dados
@@ -59,8 +59,8 @@ const Dashboard = () => {
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, active: true },
-    { id: 'analysis', name: 'Análises', icon: LineChart, active: false },
-    { id: 'projects', name: 'Projetos', icon: FolderKanban, active: false },
+    { id: 'analise', name: 'Análises', icon: LineChart, active: false },
+    { id: 'projetos', name: 'Projetos', icon: FolderKanban, active: false },
     { id: 'settings', name: 'Configurações', icon: Settings, active: false },
   ];
 
