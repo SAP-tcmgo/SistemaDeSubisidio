@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
-} from 'recharts';
-import { 
-  Menu, X, User, LayoutDashboard, LineChart, FolderKanban, Settings
-} from 'lucide-react';
+import {   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {   Menu, X, User, LayoutDashboard, LineChart, FolderKanban, Settings} from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useUser } from "../UserContext";
 
 // Dados aleatórios para os gráficos
 const deviceData = [
@@ -41,8 +39,9 @@ const marketingData = [
 const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [userName] = useState('SAP');
+  const { userName } = useUser();
   const [activeItem, setActiveItem] = useState('dashboard');
+  const navigate = useNavigate();
 
   // Simular carregamento de dados
   useEffect(() => {
@@ -54,14 +53,15 @@ const Dashboard = () => {
 
   // Toggle sidebar visibility
   const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
+    setSidebarOpen((prevSidebarOpen) => !prevSidebarOpen);
   };
+  
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, active: true },
     { id: 'analise', name: 'Análises', icon: LineChart, active: false },
     { id: 'projetos', name: 'Projetos', icon: FolderKanban, active: false },
-    { id: 'settings', name: 'Configurações', icon: Settings, active: false },
+    { id: 'configuracoes', name: 'Configurações', icon: Settings, active: false, path: '/configuracoes' },
   ];
 
   return (
@@ -84,14 +84,15 @@ const Dashboard = () => {
           <div className="flex-1 overflow-y-auto py-4 px-3">
             <nav className="space-y-1">
               {menuItems.map((item) => (
-                <button
+                <Link
                   key={item.id}
+                  to={item.path ? item.path : '#'}
                   onClick={() => setActiveItem(item.id)}
                   className={`sidebar-menu-item ${activeItem === item.id ? 'active' : ''}`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span>{item.name}</span>
-                </button>
+                </Link>
               ))}
             </nav>
           </div>
@@ -111,7 +112,7 @@ const Dashboard = () => {
 
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center justify-center w-full">
-              <img src="/LogoTCMGO.svg" alt="Logo" className="h-14" />
+              <img src="/LogoSAP.png" alt="Logo" className="h-14" />
             </div>
             <div className="flex items-center">
               <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 mr-3">

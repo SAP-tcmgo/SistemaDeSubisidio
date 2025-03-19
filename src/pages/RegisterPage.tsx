@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, Key, User } from 'lucide-react';
+import { Eye, EyeClosed, Mail, Lock, Key, User, Contact } from 'lucide-react';
 import Logo from '../components/Logo';
 import { useToast } from '../components/ui/use-toast';
 import { auth, createUserWithEmailAndPassword } from '../firebase';
@@ -10,19 +10,31 @@ import { doc, setDoc, collection, query, where, getDocs, updateDoc } from "fireb
 const RegisterPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [token, setToken] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [NomeCompleto, setNomeCompleto] = useState('');
+  const [cpf, setCpf] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email || !password || !token) {
-toast({
+    if (!email || !password || !confirmPassword || !token || !NomeCompleto || !cpf) {
+      toast({
         title: "Campos obrigatórios",
         description: "Por favor, preencha todos os campos.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      toast({
+        title: "Erro",
+        description: "As senhas não coincidem.",
         variant: "destructive",
       });
       return;
@@ -52,12 +64,37 @@ toast({
 
       // 3. Criar Usuário na coleção 'usuarios'
       const userId = user.uid;
-      const createdAt = new Date(); // Obter data e hora atuais
+      const CriadoEm = new Date(); // Obter data e hora atuais
       await setDoc(doc(db, "usuarios", userId), {
         id: userId,
         email: email,
-        fullName: fullName, // Incluir o nome completo
-        createdAt: createdAt // Incluir a data de criação
+        NomeCompleto: NomeCompleto, // Incluir o nome completo
+        cpf: cpf, // Incluir o CPF
+        CriadoEm: CriadoEm // Incluir a data de criação
+      });
+
+      // Criar registro na tabela usuario_cargo
+      // 1. Get the 'Servidor' role ID from the 'cargos' collection
+      const cargosCollection = collection(db, "cargos");
+      const qCargos = query(cargosCollection, where("nome", "==", "Servidor"));
+      const querySnapshotCargos = await getDocs(qCargos);
+
+      if (querySnapshotCargos.empty) {
+        toast({
+          title: "Erro",
+          description: "Cargo 'Servidor' não encontrado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const cargoDoc = querySnapshotCargos.docs[0];
+      const cargoId = cargoDoc.id;
+
+      // 2. Create the 'usuario_cargo' record with the correct cargo_id
+      await setDoc(doc(db, "usuario_cargo", userId), {
+        usuario_id: userId,
+        cargo_id: cargoId, // Servidor
       });
 
       // 4. Marcar Token como Usado
@@ -65,14 +102,14 @@ toast({
         usado: false // Marcar o token como usado
       });
 
-toast({
+      toast({
         title: "Cadastro realizado",
         description: "Cadastro realizado com sucesso!",
         className: "bg-green-500 text-white",
       });
       navigate('/login');
     } catch (error: any) {
-      console.error("Error signing up:", error);
+      console.error("Error ao cadastrar:", error);
       toast({
         title: "Erro ao cadastrar",
         description: error.message,
@@ -115,7 +152,7 @@ toast({
             </div>
 
             <div className="input-group">
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="NomeCompleto" className="block text-sm font-medium text-gray-700">
                 Nome Completo
               </label>
               <div className="relative">
@@ -123,12 +160,31 @@ toast({
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="fullName"
+                  id="NomeCompleto"
                   type="text"
                   placeholder="Digite seu nome completo"
                   className="input-field pl-10"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  value={NomeCompleto}
+                  onChange={(e) => setNomeCompleto(e.target.value)}
+                />
+              </div>
+            </div>
+
+<div className="input-group">
+              <label htmlFor="cpf" className="block text-sm font-medium text-gray-700">
+                CPF
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Contact className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="cpf"
+                  type="text"
+                  placeholder="Digite seu CPF"
+                  className="input-field pl-10"
+                  value={cpf}
+                  onChange={(e) => setCpf(e.target.value)}
                 />
               </div>
             </div>
@@ -173,7 +229,36 @@ toast({
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
+                    <EyeClosed className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                Confirmar Senha
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirme sua senha"
+                  className="input-field pl-10 pr-10"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+                <div
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeClosed className="h-5 w-5 text-gray-400" />
                   ) : (
                     <Eye className="h-5 w-5 text-gray-400" />
                   )}
