@@ -1,74 +1,73 @@
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.login-register-page {
+  @apply bg-tribunal-blue text-foreground;
 }
 
-html {
-  font-family: 'Inter', sans-serif;
-}
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
-/* width */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
 
-/* Track */
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
 
-/* Handle */
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 5px;
-}
+    --primary: 221 83% 26%;
+    --primary-foreground: 210 40% 98%;
 
-/* Handle on hover */
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
+    --secondary: 44 89% 55%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221 83% 53%;
+
+    --radius: 0.5rem;
   }
-  to {
-    opacity: 1;
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-tribunal-blue text-foreground;
   }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-in-out forwards;
-}
+@layer components {
+  .auth-card {
+    @apply bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+                0 5px 10px -5px rgba(0, 0, 0, 0.05);
+  }
 
-.login-container,
-.register-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* Center horizontally */
-  justify-content: center; /* Center vertically */
-  min-height: 100vh;
-  background-image: url('/lovable-uploads/0a0d90cf-00ee-4896-aaad-8b054804acb0.png');
-  background-size: cover;
-  background-position: center;
-}
+  .input-group {
+    @apply space-y-1 mb-4;
+  }
 
-.login-container label,
-.register-container label {
-  text-align: left;
-  width: 100%; /* Make sure the label takes the full width */
-  margin-bottom: 0.5rem; /* Add some space between the label and the input */
-}
+  .input-field {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tribunal-lightblue focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
 
-.login-container input,
-.register-container input {
-  width: 100%;
-  padding: 0.5rem;
-  margin-bottom: 1rem; /* Add some space between the input and the next element */
-  border: 1px solid #ccc;
-  border-radius: 0.25rem;
+  .auth-button {
+    @apply w-full flex items-center justify-center gap-2 rounded-md bg-tribunal-lightblue hover:bg-tribunal-blue transition-colors text-white font-medium py-2.5 focus:outline-none focus:ring-2 focus:ring-tribunal-blue focus:ring-offset-2;
+  }
+  
+  .link {
+    @apply text-tribunal-lightblue hover:text-tribunal-blue transition-colors;
+  }
 }

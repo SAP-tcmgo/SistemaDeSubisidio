@@ -51,7 +51,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-tribunal-blue text-foreground;
   }
 }
 

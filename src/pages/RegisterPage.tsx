@@ -120,7 +120,7 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="login-register-page min-h-screen flex items-center justify-center p-4">
       <div className="auth-card w-full max-w-md">
         <div className="p-6 sm:p-8">
           <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-2" />

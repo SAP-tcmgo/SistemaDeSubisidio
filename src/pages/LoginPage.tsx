@@ -5,8 +5,6 @@ import { useToast } from '../components/ui/use-toast';
 import { auth, signInWithEmailAndPassword, sendPasswordResetEmail } from '../firebase';
 import { db } from '../firebase';
 import { collection, query, where, getDocs } from "firebase/firestore";
-import '../AppLoginRegister.css';
-import '../indexLoginRegister.css';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -119,15 +117,15 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="login-register-page min-h-screen flex items-center justify-center p-4">
       <div className="auth-card w-full max-w-md">
         <div className="p-6 sm:p-8">
-        <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-4" />
+        <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-2" />
 
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Sistema de Análise de Subsídios
           </h1>
-          <h2 className="text-xl font-semibold text-center text-gray-700 mb-3">
+          <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
             Entrar
           </h2>
 
