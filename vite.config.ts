@@ -10,7 +10,8 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   base: './',
   server: {
-    port: 8080
+    port: 8080,
+    allowedHosts: ["ccf92518-8ebc-4caa-9a0c-a6500ae49816.lovableproject.com"]
   },
   build: {
     rollupOptions: {
