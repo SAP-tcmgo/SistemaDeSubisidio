@@ -3,9 +3,14 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }: ConfigEnv) => {
   const config: UserConfigExport = {
     base: './',
+    server: {
+      port: 8080,
+      allowedHosts: ["ccf92518-8ebc-4caa-9a0c-a6500ae49816.lovableproject.com"]
+    },
     build: {
       rollupOptions: {
         input: {
@@ -23,9 +28,6 @@ export default defineConfig(({ mode }: ConfigEnv) => {
         "@": path.resolve(__dirname, "src"),
       },
     },
-    server: {
-      maxHeaderSize: 999999999999999999999,
-    } as ServerOptions,
   };
   return config;
 });
