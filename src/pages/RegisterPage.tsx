@@ -1,7 +1,8 @@
+import '../AppLoginRegister.css';
+import '../indexLoginRegister.css';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeClosed, Mail, Lock, Key, User, Contact } from 'lucide-react';
-import Logo from '../components/Logo';
 import { useToast } from '../components/ui/use-toast';
 import { auth, createUserWithEmailAndPassword } from '../firebase';
 import { db } from '../firebase';
@@ -112,7 +113,7 @@ const RegisterPage = () => {
       console.error("Error ao cadastrar:", error);
       toast({
         title: "Erro ao cadastrar",
-        description: error.message,
+        description: (error as Error).message,
         variant: "destructive",
       });
     }
@@ -122,12 +123,12 @@ const RegisterPage = () => {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="auth-card w-full max-w-md">
         <div className="p-6 sm:p-8">
-          <Logo />
+          <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-2" />
 
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Sistema de Análise de Subsídios
           </h1>
-          <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
+          <h2 className="text-xl font-semibold text-center text-gray-700 mb-3">
             Cadastrar-se
           </h2>
 

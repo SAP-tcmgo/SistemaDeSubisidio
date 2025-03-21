@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 41 73% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 100% 27%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .tribunal-button {
+    @apply bg-tribunal-gold text-white font-medium py-2 px-6 rounded-md transition-all duration-300 hover:bg-tribunal-lightGold focus:outline-none focus:ring-2 focus:ring-tribunal-gold focus:ring-opacity-50;
+  }
+  
+  .tribunal-button-secondary {
+    @apply bg-tribunal-blue text-white font-medium py-2 px-6 rounded-md transition-all duration-300 hover:bg-tribunal-lightBlue focus:outline-none focus:ring-2 focus:ring-tribunal-blue focus:ring-opacity-50;
+  }
+  
+  .tribunal-input {
+    @apply bg-white border border-gray-200 rounded-md px-4 py-2 w-full focus:outline-none focus:ring-2 focus:ring-tribunal-gold focus:ring-opacity-50;
+  }
+  
+  .tribunal-card {
+    @apply bg-white rounded-lg shadow-md p-6 transition-all duration-300;
+  }
+  
+  .tribunal-sidebar-item {
+    @apply flex items-center gap-2 p-3 rounded-md transition-colors duration-200 hover:bg-tribunal-gold/10 text-gray-700 hover:text-tribunal-gold;
+  }
+  
+  .tribunal-sidebar-item.active {
+    @apply bg-tribunal-gold/20 text-tribunal-gold font-medium;
+  }
+}

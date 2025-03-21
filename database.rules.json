@@ -1,6 +1,6 @@
 {
   "rules": {
     ".read": "auth != null",
-    ".write": "auth != null && auth.uid == 'ADMIN_UID'"
+    ".write": "auth != null && auth.uid != null && root.child('users').child(auth.uid).exists()"
   }
 }

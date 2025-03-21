@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 // Consulte https://tailwindcss.com/docs/configuration para obter mais informações
@@ -27,6 +26,18 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				tribunal: {
+					gold: '#C9991F',
+					blue: '#004B8D',
+					lightBlue: '#0081C9',
+					lightGold: '#E9BE5D',
+					gray: '#F5F5F5',
+					'blue-2': '#004285',
+					'gold-2': '#F6B221',
+					'lightblue-2': '#0077CC',
+					'lightblue': '#0081C9'
+				},
+				'ring-tribunal-lightblue': '#0081C9',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))'
@@ -54,11 +65,6 @@ export default {
 				card: {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
-				},
-				tribunal: {
-					blue: '#004285',
-					gold: '#F6B221',
-					lightblue: '#0077CC'
 				},
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
@@ -110,13 +116,30 @@ export default {
 					'50%': {
 						opacity: '0.85'
 					}
+				},
+				fadeIn: {
+					'0%': { opacity: '0' },
+					'100%': { opacity: '1' }
+				},
+				slideIn: {
+					'0%': { transform: 'translateY(20px)', opacity: '0' },
+					'100%': { transform: 'translateY(0)', opacity: '1' }
+				},
+				pulse: {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.5' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'fade-in': 'fade-in 0.5s ease-out forwards',
-				'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite'
+				'pulse-subtle': 'pulse-subtle 2s ease-in-out infinite',
+				'slide-in': 'slideIn 0.5s ease-out forwards',
+				'pulse-slow': 'pulse 3s ease-in-out infinite'
+			},
+			backgroundImage: {
+				'tribunal-pattern': "url('/lovable-uploads/0a0d90cf-00ee-4896-aaad-8b054804acb0.png')",
 			}
 		}
 	},

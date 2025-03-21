@@ -1,28 +1,31 @@
-import { defineConfig } from "vite";
+import { defineConfig, UserConfigExport, ServerOptions, ConfigEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// https://vitejs.dev/config/pt-br
-// Consulte https://vitejs.dev/config/ para obter mais informações
-// Arquivo de configuração do Vite
-export default defineConfig(({ mode }) => ({
-  base: './',
-  build: {
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html'),
+export default defineConfig(({ mode }: ConfigEnv) => {
+  const config: UserConfigExport = {
+    base: './',
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+        },
       },
     },
-  },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
+    plugins: [
+      react(),
+      mode === 'development' &&
+      componentTagger(),
+    ].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+      },
     },
-  },
-}));
+    server: {
+      maxHeaderSize: 999999999999999999999,
+    } as ServerOptions,
+  };
+  return config;
+});

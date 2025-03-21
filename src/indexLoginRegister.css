@@ -1,0 +1,74 @@
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+html {
+  font-family: 'Inter', sans-serif;
+}
+
+/* width */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-in-out forwards;
+}
+
+.login-container,
+.register-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Center horizontally */
+  justify-content: center; /* Center vertically */
+  min-height: 100vh;
+  background-image: url('/lovable-uploads/0a0d90cf-00ee-4896-aaad-8b054804acb0.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.login-container label,
+.register-container label {
+  text-align: left;
+  width: 100%; /* Make sure the label takes the full width */
+  margin-bottom: 0.5rem; /* Add some space between the label and the input */
+}
+
+.login-container input,
+.register-container input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem; /* Add some space between the input and the next element */
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+}

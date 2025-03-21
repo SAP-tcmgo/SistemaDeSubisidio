@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeClosed, Mail, Lock } from 'lucide-react';
-import Logo from '../components/Logo';
 import { useToast } from '../components/ui/use-toast';
 import { auth, signInWithEmailAndPassword, sendPasswordResetEmail } from '../firebase';
 import { db } from '../firebase';
 import { collection, query, where, getDocs } from "firebase/firestore";
+import '../AppLoginRegister.css';
+import '../indexLoginRegister.css';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -106,7 +107,7 @@ const LoginPage = () => {
         description: "Login realizado com sucesso!",
         className: "bg-green-500 text-white",
       });
-      navigate('/dashboard');
+      navigate('/telaInicial');
     } catch (error: any) {
       toast({
         title: "Erro ao logar",
@@ -121,12 +122,12 @@ const LoginPage = () => {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="auth-card w-full max-w-md">
         <div className="p-6 sm:p-8">
-          <Logo />
+        <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-4" />
 
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Sistema de Análise de Subsídios
           </h1>
-          <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
+          <h2 className="text-xl font-semibold text-center text-gray-700 mb-3">
             Entrar
           </h2>
 

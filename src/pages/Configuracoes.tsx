@@ -1,169 +1,211 @@
-import React, { useState, useEffect } from 'react';
-import { Menu, X, User, LayoutDashboard, LineChart, FolderKanban, Settings } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, getFirestore } from "firebase/firestore";
-import { nanoid } from 'nanoid';
-import { collection, addDoc } from 'firebase/firestore';
-import { toast } from 'sonner';
-import { useUser } from "../UserContext";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import '../AppConfiguracoesDashboard.css';
+import '../indexConfiguracoesDashboard.css';
+import { User, Mail, Shield, LogOut, ArrowLeft} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { Button } from "../components/ui/button";
+import { Form, FormControl,  FormField, FormItem, FormLabel } from '../components/ui/form';
+import { useForm } from "react-hook-form";
+import { useUser } from '../UserContext';
+import { useToast } from "@/components/ui/use-toast"
 
-const Configuracoes = () => {
-  const [cargoNome, setCargoNome] = useState('');
-  const [token, setToken] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeItem, setActiveItem] = useState('configuracoes');
+export default function Configuracoes() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("perfil");
+  const { userRoles, userName, userEmail, usercpf, updateUser } = useUser();
 
-  const db = getFirestore();
-
-  const { userName } = useUser();
-
-  const handleCriarCargo = async () => {
-    try {
-      const docRef = await addDoc(collection(db, "cargos"), {
-        nome: cargoNome
-      });
-      console.log("Cargo criado com ID: ", docRef.id);
-      toast.success('Cargo criado com sucesso!');
-      setCargoNome('');
-    } catch (e) {
-      console.error("Erro ao adicionar cargo: ", e);
-      toast.error('Erro ao criar cargo.');
+  const { toast } = useToast()
+  
+  const form = useForm({
+    defaultValues: {
+      nome: userName,
+      email: userEmail,
+      cargos: userRoles,
+      cpf: usercpf,
     }
-  };
+  });
 
-  const handleGerarToken = async () => {
-    const novoToken = nanoid();
-    setToken(novoToken);
+  const handleSubmit = async (data: any) => {
+    console.log("Form submitted:", data);
     try {
-      const docRef = await addDoc(collection(db, "tokens"), {
-        token: novoToken,
-        usado: false,
-        data_geracao: new Date()
+      await updateUser({
+        userName: data.nome,
+        userEmail: data.email,
+        usercpf: data.cpf,
       });
-      console.log("Token gerado com ID: ", docRef.id);
-      toast.success('Token gerado com sucesso!');
-    } catch (e) {
-      console.error("Erro ao adicionar token: ", e);
-      toast.error('Erro ao gerar token.');
+      toast({
+        title: "Perfil atualizado com sucesso!",
+        className: "bg-green-500 text-white",
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar o perfil:", error);
+      toast({
+        title: "Erro ao atualizar o perfil. Tente novamente.",
+        variant: "destructive",
+      });
     }
-  };
-
-  // Toggle sidebar visibility
-  const toggleSidebar = () => {
-    setSidebarOpen((prevSidebarOpen) => !prevSidebarOpen);
-  };
-
-  const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, active: false, path: '/dashboard' },
-    { id: 'analise', name: 'Análises', icon: LineChart, active: false, path: '/analise' },
-    { id: 'projetos', name: 'Projetos', icon: FolderKanban, active: false, path: '/projetos' },
-    { id: 'configuracoes', name: 'Configurações', icon: Settings, active: true },
-  ];
-
-  return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:relative md:translate-x-0`}
-      >
-        <div className="h-full flex flex-col">
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-center h-16 border-b border-sidebar-border">
-            <span className="text-xl font-semibold text-sidebar-foreground">
-              Dashboard
-            </span>
-          </div>
-
-          {/* Sidebar Menu */}
-          <div className="flex-1 overflow-y-auto py-4 px-3">
-            <nav className="space-y-1">
-              {menuItems.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.path ? item.path : '#'}
-                  onClick={() => setActiveItem(item.id)}
-                  className={`sidebar-menu-item ${activeItem === item.id ? 'active' : ''}`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.name}</span>
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 md:px-6">
-          <button
-            onClick={toggleSidebar}
-            className="p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none transition-colors"
-          >
-            {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-
-          <div className="flex items-center justify-between w-full">
-            <div className="flex items-center justify-center w-full">
-              <img src="/LogoSAP.png" alt="Logo" className="h-14" />
-            </div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 mr-3">
-                <User className="h-5 w-5" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">{userName}</span>
-            </div>
-          </div>
-        </header>
-
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold mb-4">Configurações</h1>
-
-            {/* Criar Cargo */}
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold mb-2">Criar Cargo</h2>
-              <input
-                type="text"
-                placeholder="Nome do Cargo"
-                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                value={cargoNome}
-                onChange={(e) => setCargoNome(e.target.value)}
-              />
-              <button
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline mt-2"
-                onClick={handleCriarCargo}
-              >
-                Criar Cargo
-              </button>
-            </div>
-
-            {/* Gerar Token */}
-            <div>
-              <h2 className="text-xl font-semibold mb-2">Gerar Token</h2>
-              <button
-                className="bg-[#C9991F] hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                onClick={handleGerarToken}
-              >
-                Gerar Token
-              </button>
-              {token && (
-                <div className="mt-2">
-                  <strong>Token Gerado:</strong> {token}
-                </div>
-              )}
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
 };
 
-export default Configuracoes;
+  return (
+    <div className="container mx-auto py-6 px-4 md:px-6">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="flex items-center mb-6 cursor-pointer" onClick={() => navigate('/TelaInicial')}>
+          <ArrowLeft className="mr-2 text-tribunal-blue" size={24} />
+          <h1 className="text-3xl font-bold text-tribunal-blue">Configurações</h1>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          {/* Sidebar de navegação */}
+          <Card className="md:col-span-3 shadow-md">
+            <CardContent className="p-0">
+              <nav className="flex flex-col">
+                {[
+                  { id: "perfil", label: "Perfil", icon: <User size={18} /> },
+                  { id: "conta", label: "Conta", icon: <Mail size={18} /> },
+                  { id: "admin", label: "Área de administrador", icon: <Shield size={18} /> },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    className={`flex items-center gap-3 p-4 text-left transition-colors hover:bg-gray-100 ${
+                      activeTab === item.id ? "bg-tribunal-gold/10 text-tribunal-gold border-l-4 border-tribunal-gold" : "text-gray-700"
+                    }`}
+                    onClick={() => setActiveTab(item.id)}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+                
+                <button className="flex items-center gap-3 p-4 text-left text-red-500 hover:bg-red-50 mt-auto border-t">
+                  <LogOut size={18} />
+                  <span>Sair</span>
+                </button>
+              </nav>
+            </CardContent>
+          </Card>
+          
+          {/* Conteúdo principal */}
+          <Card className="md:col-span-9 shadow-md">
+            <CardHeader>
+              <CardTitle className="text-2xl text-tribunal-blue">
+                {activeTab === "perfil" && "Informações de Perfil"}
+                {activeTab === "conta" && "Configurações de Conta"}
+                {activeTab === "seguranca" && "Segurança"}
+                {activeTab === "admin" && "Área de administrador"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                  {activeTab === "perfil" && (
+                    <>
+                      <div className="flex flex-col sm:flex-row gap-6 items-start">
+                        <div className="flex-1 space-y-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="nome"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Nome completo</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="cpf"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>CPF</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} type="email" />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="cargos"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Cargos</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} value={userRoles.join(', ')} disabled />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {activeTab === "conta" && (
+                    <div className="space-y-4">
+                    <div className="rounded-lg border p-4">
+                      <div className="font-medium">Alterar senha</div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Receba um e-mail para alterar sua senha.
+                      </p>
+                      <Button variant="outline">Alterar senha</Button>
+                    </div>
+                  </div>
+                  )}
+
+                  {activeTab === "admin" && (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border p-4">
+                        <div className="font-medium">Cargos</div>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Área para edição e inclusão de cargos.
+                        </p>
+                        <Button variant="outline">Cargos</Button>
+                      </div>
+                      
+                      <div className="rounded-lg border p-4">
+                        <div className="font-medium">Gerar Token</div>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Gere um Token para um novo cadastro.
+                        </p>
+                        <Button variant="outline">Gerar Token</Button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Botões de ação */}
+                  <div className="flex justify-end space-x-4 pt-4 border-t">
+                    <Button type="submit" className="bg-tribunal-gold hover:bg-tribunal-gold/90">Salvar alterações</Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
