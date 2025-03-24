@@ -2,7 +2,7 @@ import React from 'react';
 
 const Painel = () => {
   return (
-    <div>
+    <div className="dashboard-theme">
       <h1>Painel</h1>
     </div>
   );

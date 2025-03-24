@@ -2,72 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-.login-register-page {
-  @apply bg-tribunal-blue text-foreground;
+.login-register-theme {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 47.4% 11.2%;
+
+  --primary: #004B8D;
+  --primary-foreground: 210 100% 98%;
+
+  --secondary: #C9991F;
+  --secondary-foreground: 210 100% 98%;
+
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 100% 98%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+
+  --ring: #004B8D;
+  --radius: 0.5rem;
 }
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 221 83% 26%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 44 89% 55%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221 83% 53%;
-
-    --radius: 0.5rem;
-  }
-
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-tribunal-blue text-foreground;
-  }
-}
-
-@layer components {
-  .auth-card {
-    @apply bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
-                0 5px 10px -5px rgba(0, 0, 0, 0.05);
-  }
-
-  .input-group {
-    @apply space-y-1 mb-4;
-  }
-
-  .input-field {
-    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tribunal-lightblue focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .auth-button {
-    @apply w-full flex items-center justify-center gap-2 rounded-md bg-tribunal-lightblue hover:bg-tribunal-blue transition-colors text-white font-medium py-2.5 focus:outline-none focus:ring-2 focus:ring-tribunal-blue focus:ring-offset-2;
-  }
-  
-  .link {
-    @apply text-tribunal-lightblue hover:text-tribunal-blue transition-colors;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

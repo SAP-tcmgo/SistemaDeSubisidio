@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { nanoid } from 'nanoid';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { db, auth, sendPasswordResetEmail } from '../firebase';
+import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import '../AppConfiguracoesDashboard.css';
 import '../indexConfiguracoesDashboard.css';
 import { User, Mail, Shield, LogOut, ArrowLeft} from 'lucide-react';
@@ -15,9 +19,81 @@ import { useToast } from "@/components/ui/use-toast"
 export default function Configuracoes() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
+  const [tokenVisible, setTokenVisible] = useState(false);
   const { userRoles, userName, userEmail, usercpf, updateUser } = useUser();
 
+  useEffect(() => {
+    auth.currentUser;
+  }, []);
+
   const { toast } = useToast()
+
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+
+  const handleGenerateToken = async () => {
+    try {
+      // Check for unused tokens
+      const tokensRef = collection(db, 'tokens');
+      const q = query(tokensRef, where('usado', '==', false));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        // Unused token found
+        const tokenDoc = querySnapshot.docs[0];
+        const token = tokenDoc.data().token;
+        setGeneratedToken(token);
+        setTokenVisible(true);
+        // Update token to mark as used
+        return;
+      }
+
+      // Não existe token não usado no db, gera um novo
+      const newToken = nanoid();
+      await addDoc(tokensRef, {
+        data_geracao: Timestamp.now(),
+        token: newToken,
+        usado: false,
+      });
+
+      setGeneratedToken(newToken);
+      toast({
+        title: "Novo token gerado",
+        description: `Token: ${newToken}`,
+      });
+    } catch (error) {
+      console.error("Error generating token:", error);
+      toast({
+        title: "Erro ao gerar token",
+        description: "Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
+
+    const handleForgotPassword = () => {
+    if (userEmail) {
+      sendPasswordResetEmail(auth, userEmail)
+        .then(() => {
+          console.log("Link de redefinição de senha enviado com sucesso para: " + userEmail);
+          toast({
+            title: "Link de redefinição enviado",
+            description: "Verifique seu e-mail para redefinir sua senha.",
+          });
+        })
+        .catch((error: any) => {
+          let errorMessage = "Ocorreu um erro ao enviar o email de redefinição. Verifique se o email está correto.";
+          if (error.code === 'auth/user-not-found') {
+            errorMessage = "Não existe usuário com este email.";
+          }
+          toast({
+            title: "Erro ao enviar email de redefinição",
+            description: errorMessage,
+            variant: "destructive",
+          });
+          console.error("Erro ao enviar o link de redefinição de senha:", error);
+        });
+    }
+  };
   
   const form = useForm({
     defaultValues: {
@@ -27,6 +103,14 @@ export default function Configuracoes() {
       cpf: usercpf,
     }
   });
+
+  useEffect(() => {
+    form.reset({
+      nome: userName,
+      email: userEmail,
+      cpf: usercpf,
+    });
+  }, [userName, userEmail, usercpf, form]);
 
   const handleSubmit = async (data: any) => {
     console.log("Form submitted:", data);
@@ -50,7 +134,7 @@ export default function Configuracoes() {
 };
 
   return (
-    <div className="container mx-auto py-6 px-4 md:px-6">
+    <div className="dashboard-theme container mx-auto py-6 px-4 md:px-6">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -103,7 +187,11 @@ export default function Configuracoes() {
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+                <form onSubmit={form.handleSubmit((data) => {
+                  if (activeTab === 'perfil') {
+                    handleSubmit(data);
+                  }
+                })} className="space-y-6">
                   {activeTab === "perfil" && (
                     <>
                       <div className="flex flex-col sm:flex-row gap-6 items-start">
@@ -161,6 +249,9 @@ export default function Configuracoes() {
                           </div>
                         </div>
                       </div>
+                      <div className="flex justify-end space-x-4 pt-4 border-t">
+                        <Button type="submit" className="bg-tribunal-gold hover:bg-tribunal-gold/90">Salvar alterações</Button>
+                      </div>
                     </>
                   )}
 
@@ -171,7 +262,7 @@ export default function Configuracoes() {
                       <p className="text-sm text-muted-foreground mb-4">
                         Receba um e-mail para alterar sua senha.
                       </p>
-                      <Button variant="outline">Alterar senha</Button>
+                      <Button variant="outline" onClick={handleForgotPassword}>Alterar senha</Button>
                     </div>
                   </div>
                   )}
@@ -185,21 +276,34 @@ export default function Configuracoes() {
                         </p>
                         <Button variant="outline">Cargos</Button>
                       </div>
-                      
+
                       <div className="rounded-lg border p-4">
                         <div className="font-medium">Gerar Token</div>
                         <p className="text-sm text-muted-foreground mb-4">
                           Gere um Token para um novo cadastro.
                         </p>
-                        <Button variant="outline">Gerar Token</Button>
+                        <Button variant="outline" onClick={handleGenerateToken}>Gerar Token</Button>
+                        {tokenVisible && generatedToken && (
+                          <div className="flex items-center space-x-2 mt-2">
+                            <Input
+                              type="text"
+                              value={generatedToken}
+                              readOnly
+                              className="w-full md:w-auto"
+                            />
+                            <CopyToClipboard text={generatedToken} onCopy={() => toast({
+                                title: "Token copiado",
+                                description: "Token copiado para a área de transferência.",
+                            })}>
+                              <Button variant="outline">
+                                Copiar Token
+                              </Button>
+                            </CopyToClipboard>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
-                  
-                  {/* Botões de ação */}
-                  <div className="flex justify-end space-x-4 pt-4 border-t">
-                    <Button type="submit" className="bg-tribunal-gold hover:bg-tribunal-gold/90">Salvar alterações</Button>
-                  </div>
                 </form>
               </Form>
             </CardContent>

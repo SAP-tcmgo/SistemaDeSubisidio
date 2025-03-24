@@ -1,3 +1,5 @@
+import '../AppLoginRegister.css';
+import '../indexLoginRegister.css';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeClosed, Mail, Lock } from 'lucide-react';
@@ -117,79 +119,81 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="login-register-page min-h-screen flex items-center justify-center p-4">
-      <div className="auth-card w-full max-w-md">
-        <div className="p-6 sm:p-8">
-        <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-2" />
+    <div className="login-register-theme">
+      <div className="login-background min-h-screen flex items-center justify-center p-4">
+        <div className="auth-card w-full max-w-md">
+          <div className="p-6 sm:p-8">
+          <img src="/LogoTCMGO.svg?v=1" alt="Logo" className="flex item-center h-17 mb-2" />
 
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-            Sistema de Análise de Subsídios
-          </h1>
-          <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
-            Entrar
-          </h2>
-
-          <form onSubmit={handleSubmit}>
-            <div className="input-group">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email ou CPF
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="email"
-                  type="text"
-                  placeholder="Digite seu email ou CPF"
-                  className="input-field pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Senha
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Digite sua senha"
-                  className="input-field pl-10 pr-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <div
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeClosed className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <button type="submit" className="auth-button mt-6">
+            <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
+              Sistema de Análise de Subsídios
+            </h1>
+            <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">
               Entrar
-            </button>
-          </form>
+            </h2>
 
-          <div className="mt-4 text-center text-sm">
-            <p className="text-gray-600">
-              <button onClick={handleForgotPassword} className="link font-medium">Esqueci minha senha</button>
-            </p>
-            <p className="mt-3 text-gray-600">
-              Não possui uma conta? <Link to="/cadastrar" className="link font-medium">Cadastrar-se</Link>
-            </p>
+            <form onSubmit={handleSubmit}>
+              <div className="input-group">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email ou CPF
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="email"
+                    type="text"
+                    placeholder="Digite seu email ou CPF"
+                    className="input-field pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Senha
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Digite sua senha"
+                    className="input-field pl-10 pr-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <div
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeClosed className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="auth-button mt-6">
+                Entrar
+              </button>
+            </form>
+
+            <div className="mt-4 text-center text-sm">
+              <p className="text-gray-600">
+                <button onClick={handleForgotPassword} className="link font-medium">Esqueci minha senha</button>
+              </p>
+              <p className="mt-3 text-gray-600">
+                Não possui uma conta? <Link to="/cadastrar" className="link font-medium">Cadastrar-se</Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>

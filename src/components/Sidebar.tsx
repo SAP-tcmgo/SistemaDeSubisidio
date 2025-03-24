@@ -38,7 +38,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
       {/* Sidebar */}
       <div className={`
         fixed top-0 left-0 h-full bg-white shadow-lg z-30 transition-all duration-300 ease-in-out
-        ${isMobile ? (isOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'}
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         ${isMobile ? 'w-64' : 'w-64'} 
       `}>
         <div className="flex flex-col h-full">
@@ -78,16 +78,6 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 );
               })}
             </nav>
-          </div>
-          
-          {/* Footer */}
-          <div className="p-4 border-t">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="w-7 h-7 rounded-full bg-tribunal-gold flex items-center justify-center text-white">
-                U
-              </div>
-              <span>Usuário TCMGO</span>
-            </div>
           </div>
         </div>
       </div>
