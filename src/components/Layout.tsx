@@ -38,7 +38,6 @@ const Layout = ({ children }: LayoutProps) => {
             <div className="flex items-center justify-center w-full">
               <img src="/LogoSAP.png" alt="Logo" className="h-14" />
             </div>
-            {/* You can add user profile here */}
           </div>
         </header>
 

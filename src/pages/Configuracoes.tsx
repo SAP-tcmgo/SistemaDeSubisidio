@@ -4,9 +4,9 @@ import { nanoid } from 'nanoid';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { db, auth, sendPasswordResetEmail } from '../firebase';
 import { collection, query, where, getDocs, addDoc, Timestamp } from 'firebase/firestore';
-import '../AppConfiguracoesDashboard.css';
-import '../indexConfiguracoesDashboard.css';
-import { User, Mail, Shield, LogOut, ArrowLeft} from 'lucide-react';
+import '../styles/AppConfiguracoesDashboard.css';
+import '../styles/indexConfiguracoesDashboard.css';
+import { User, Mail, Shield, LogOut, ArrowLeft, PlusCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -20,11 +20,42 @@ export default function Configuracoes() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("perfil");
   const [tokenVisible, setTokenVisible] = useState(false);
+  const [showCargoManagement, setShowCargoManagement] = useState(false);
+  const [newRole, setNewRole] = useState('');
+  const [roles, setRoles] = useState<string[]>([]);
   const { userRoles, userName, userEmail, usercpf, updateUser } = useUser();
 
   useEffect(() => {
-    auth.currentUser;
+    const fetchRoles = async () => {
+      const rolesCollection = collection(db, 'cargos');
+      const rolesSnapshot = await getDocs(rolesCollection);
+      const fetchedRoles = rolesSnapshot.docs.map((doc) => doc.data().nome);
+      setRoles(fetchedRoles);
+    };
+
+    fetchRoles();
   }, []);
+
+  const handleAddRole = async () => {
+    if (newRole.trim() !== '') {
+      try {
+        const rolesCollection = collection(db, 'cargos');
+        await addDoc(rolesCollection, { nome: newRole });
+        setRoles([...roles, newRole]);
+        setNewRole('');
+        toast({
+          title: 'Cargo adicionado com sucesso!',
+          className: 'bg-green-500 text-white',
+        });
+      } catch (error) {
+        console.error('Erro ao adicionar cargo:', error);
+        toast({
+          title: 'Erro ao adicionar cargo. Tente novamente.',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
 
   const { toast } = useToast()
 
@@ -56,10 +87,6 @@ export default function Configuracoes() {
       });
 
       setGeneratedToken(newToken);
-      toast({
-        title: "Novo token gerado",
-        description: `Token: ${newToken}`,
-      });
     } catch (error) {
       console.error("Error generating token:", error);
       toast({
@@ -83,7 +110,7 @@ export default function Configuracoes() {
         .catch((error: any) => {
           let errorMessage = "Ocorreu um erro ao enviar o email de redefinição. Verifique se o email está correto.";
           if (error.code === 'auth/user-not-found') {
-            errorMessage = "Não existe usuário com este email.";
+            errorMessage = "E-mail não encontrado no banco de dados.";
           }
           toast({
             title: "Erro ao enviar email de redefinição",
@@ -140,7 +167,7 @@ export default function Configuracoes() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="flex items-center mb-6 cursor-pointer" onClick={() => navigate('/TelaInicial')}>
+        <div className="flex items-center mb-6 cursor-pointer" onClick={() => navigate('/telaInicial')}>
           <ArrowLeft className="mr-2 text-tribunal-blue" size={24} />
           <h1 className="text-3xl font-bold text-tribunal-blue">Configurações</h1>
         </div>
@@ -167,7 +194,13 @@ export default function Configuracoes() {
                   </button>
                 ))}
                 
-                <button className="flex items-center gap-3 p-4 text-left text-red-500 hover:bg-red-50 mt-auto border-t">
+                <button className="flex items-center gap-3 p-4 text-left text-red-500 hover:bg-red-50 mt-auto border-t" onClick={() => {
+                  if (window.confirm('Deseja realmente sair?')) {
+                    auth.signOut().then(() => {
+                      navigate('/login');
+                    });
+                  }
+                }}>
                   <LogOut size={18} />
                   <span>Sair</span>
                 </button>
@@ -182,7 +215,19 @@ export default function Configuracoes() {
                 {activeTab === "perfil" && "Informações de Perfil"}
                 {activeTab === "conta" && "Configurações de Conta"}
                 {activeTab === "seguranca" && "Segurança"}
-                {activeTab === "admin" && "Área de administrador"}
+                {activeTab === "admin" && (
+                  <>
+                    {showCargoManagement && (
+                      <div className="flex items-center cursor-pointer" onClick={() => setShowCargoManagement(false)}>
+                        <ArrowLeft className="mr-2 text-tribunal-blue" size={24} />
+                        <span>Área de administrador</span>
+                      </div>
+                    )}
+                    {!showCargoManagement && (
+                      <span>Área de administrador</span>
+                    )}
+                  </>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -194,8 +239,8 @@ export default function Configuracoes() {
                 })} className="space-y-6">
                   {activeTab === "perfil" && (
                     <>
-                      <div className="flex flex-col sm:flex-row gap-6 items-start">
-                        <div className="flex-1 space-y-4">
+                      <div className="flex flex-col sm:flex-row gap-6 items-start rounded-lg border p-4">
+                        <div className="flex-1 space-y-4 ">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                               control={form.control}
@@ -269,39 +314,70 @@ export default function Configuracoes() {
 
                   {activeTab === "admin" && (
                     <div className="space-y-4">
-                      <div className="rounded-lg border p-4">
-                        <div className="font-medium">Cargos</div>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Área para edição e inclusão de cargos.
-                        </p>
-                        <Button variant="outline">Cargos</Button>
-                      </div>
-
-                      <div className="rounded-lg border p-4">
-                        <div className="font-medium">Gerar Token</div>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Gere um Token para um novo cadastro.
-                        </p>
-                        <Button variant="outline" onClick={handleGenerateToken}>Gerar Token</Button>
-                        {tokenVisible && generatedToken && (
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Input
-                              type="text"
-                              value={generatedToken}
-                              readOnly
-                              className="w-full md:w-auto"
-                            />
-                            <CopyToClipboard text={generatedToken} onCopy={() => toast({
-                                title: "Token copiado",
-                                description: "Token copiado para a área de transferência.",
-                            })}>
-                              <Button variant="outline">
-                                Copiar Token
-                              </Button>
-                            </CopyToClipboard>
+                      {!showCargoManagement && (
+                        <>
+                          <div className="rounded-lg border p-4">
+                            <div className="font-medium">Cargos</div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Área para edição e inclusão de cargos.
+                            </p>
+                            <Button variant="outline" onClick={() => setShowCargoManagement(!showCargoManagement)}>Cargos</Button>
                           </div>
-                        )}
-                      </div>
+                          <div className="rounded-lg border p-4">
+
+                            <div className="font-medium">Gerar Token</div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Gere um Token para um novo cadastro.
+                            </p>
+                            <Button variant="outline" onClick={handleGenerateToken}>Gerar Token</Button>
+                            {tokenVisible && generatedToken && (
+                              <div className="flex items-center space-x-2 mt-2">
+                                <Input
+                                  type="text"
+                                  value={generatedToken}
+                                  readOnly
+                                  className="w-full md:w-auto"
+                                />
+                                <CopyToClipboard text={generatedToken} onCopy={() => toast({
+                                    title: "Token copiado",
+                                    description: "Token copiado para a área de transferência.",
+                                })}>
+                                  <Button variant="outline">
+                                    Copiar Token
+                                  </Button>
+                                </CopyToClipboard>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {showCargoManagement && (
+                        <div className="flex justify-between rounded-lg border p-4">
+                          <div className="w-1/3">
+                        <div className="relative w-full">
+                          <Input
+                            type="text"
+                            placeholder="Novo cargo"
+                            value={newRole}
+                            onChange={(e) => setNewRole(e.target.value)}
+                            className="w-full pl-8"
+                          />
+                          <PlusCircle className="absolute left-2 top-1/2 transform -translate-y-1/2 text-tribunal-blue" size={20} />
+                        </div>
+                            <Button onClick={handleAddRole} className="mt-2">Adicionar Cargo</Button>
+                          </div>
+                          <div className="w-1/2 flex flex-col items-center justify-center">
+                            <h2 className="text-xl font-semibold mb-4 text-tribunal-blue">Cargos existentes</h2>
+                            <ul className="list-disc list-inside bg-gray-100 p-4 rounded-lg shadow-md">
+                              {roles.map((role) => (
+                                <li key={role} className="py-1 text-gray-700">{role}</li>
+                              ))}
+                            </ul>
+
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </form>

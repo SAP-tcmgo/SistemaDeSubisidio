@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, LineChart, FolderCog, Settings, X } from 'lucide-react';
 import { useIsMobile } from '../hooks/use-mobile';
@@ -8,21 +7,19 @@ interface SidebarProps {
   setIsOpen: (isOpen: boolean) => void;
 }
 
-const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
+const Sidebar = ({ isOpen = false, setIsOpen }: SidebarProps) => {
   const location = useLocation();
   const isMobile = useIsMobile();
   
   const sidebarLinks = [
-    { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/' },
-    { name: 'Análises', icon: <LineChart size={20} />, path: '/analises' },
-    { name: 'Projetos', icon: <FolderCog size={20} />, path: '/projetos' },
+    { name: 'Painel', icon: <LayoutDashboard size={20} />},
+    { name: 'Análises', icon: <LineChart size={20} />},
+    { name: 'Projetos', icon: <FolderCog size={20} />},
     { name: 'Configurações', icon: <Settings size={20} />, path: '/configuracoes' },
   ];
 
   const closeSidebar = () => {
-    if (isMobile) {
-      setIsOpen(false);
-    }
+    setIsOpen(false);
   };
 
   return (
@@ -39,7 +36,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
       <div className={`
         fixed top-0 left-0 h-full bg-white shadow-lg z-30 transition-all duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${isMobile ? 'w-64' : 'w-64'} 
+         w-64
       `}>
         <div className="flex flex-col h-full">
           {/* Sidebar header */}
@@ -68,7 +65,7 @@ const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
                 return (
                   <Link
                     key={link.path}
-                    to={link.path}
+                    to={link.path ?? ''}
                     className={`tribunal-sidebar-item ${isActive ? 'active' : ''}`}
                     onClick={closeSidebar}
                   >

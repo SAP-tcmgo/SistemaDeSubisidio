@@ -10,10 +10,7 @@ import TelaInicial from "./pages/TelaInicial";
 import Configuracoes from "./pages/Configuracoes";
 import { UserProvider } from "./UserContext";
 import Painel from "./pages/Painel";
-import "./indexLoginRegister.css";
-import "./AppLoginRegister.css";
-import "./indexConfiguracoesDashboard.css";
-import "./AppConfiguracoesDashboard.css";
+import DadosMunicipioEResponsaveis from "./pages/DadosMunicipioEResponsaveis";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +28,7 @@ const App = () => (
             <Route path="/telaInicial" element={<TelaInicial />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="/painel" element={<Painel />} />
+            <Route path="/DadosMunicipioEResponsaveis" element={<DadosMunicipioEResponsaveis />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
