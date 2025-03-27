@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useIsMobile } from '../hooks/use-mobile';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import WelcomeSection from '../components/WelcomeSection';
@@ -64,7 +63,12 @@ const TelaInicial = () => {
                       }}>
                         Iniciar ou Editar
                       </button>
-                      <button className="tribunal-button-secondary w-full justify-center">
+                      <button className="tribunal-button-secondary w-full justify-center" onClick={() => {
+                        const processNumber = (document.querySelector('input[placeholder="Número do Processo (nnnnn/aa)"]') as HTMLInputElement)?.value;
+                        if (processNumber) {
+                          window.location.href = `/DadosMunicipioEResponsaveis?NrProcesso=${processNumber}`;
+                        }
+                      }}>
                         Consultar
                       </button>
                       <button className="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-6 rounded-md w-full transition-all duration-300 hover:bg-gray-50">
@@ -77,7 +81,7 @@ const TelaInicial = () => {
             </motion.div>
             
             <footer className="mt-8 text-center text-gray-500 text-sm py-4">
-              <p>Tribunal de Contas dos Municípios do Estado de Goiás &copy; {new Date().getFullYear()}</p>
+              <p>Secretaria de Atos de Pessoal &copy; 2025</p>
             </footer>
           </main>
         </div>

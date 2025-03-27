@@ -1,11 +1,11 @@
-import '../styles/AppLoginRegister.css';
-import '../styles/indexLoginRegister.css';
+import '../../styles/AppLoginRegister.css';
+import '../../styles/indexLoginRegister.css';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeClosed, Mail, Lock, Key, User, Contact } from 'lucide-react';
-import { useToast } from '../components/ui/use-toast';
-import { auth, createUserWithEmailAndPassword } from '../firebase';
-import { db } from '../firebase';
+import { useToast } from '../../components/ui/use-toast';
+import { auth, createUserWithEmailAndPassword } from '../../firebase';
+import { db } from '../../firebase';
 import { doc, setDoc, collection, query, where, getDocs, updateDoc } from "firebase/firestore";
 
 const RegisterPage = () => {

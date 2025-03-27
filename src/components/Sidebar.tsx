@@ -64,7 +64,7 @@ const Sidebar = ({ isOpen = false, setIsOpen }: SidebarProps) => {
                 const isActive = location.pathname === link.path;
                 return (
                   <Link
-                    key={link.path}
+                    key={link.name}
                     to={link.path ?? ''}
                     className={`tribunal-sidebar-item ${isActive ? 'active' : ''}`}
                     onClick={closeSidebar}

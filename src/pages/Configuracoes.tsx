@@ -13,7 +13,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Form, FormControl,  FormField, FormItem, FormLabel } from '../components/ui/form';
 import { useForm } from "react-hook-form";
-import { useUser } from '../UserContext';
+import { useUser } from '../Contexts/UserContext';
 import { useToast } from "@/components/ui/use-toast"
 
 export default function Configuracoes() {

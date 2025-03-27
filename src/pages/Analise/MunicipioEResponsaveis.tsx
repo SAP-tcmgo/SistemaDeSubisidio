@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, ArrowLeft } from 'lucide-react';
-import Header from '../components/Header';
-import Switch from '../components/Switch';
-import Sidebar from '../components/Sidebar';
-import { municipiosGoias } from '../dados/municipios';
-import '../styles/AppMunicipios.css';
-import '../styles/indexMunicipios.css';
+import { MdSearch as Search, MdHome as Home, MdOutlineArrowCircleRight as CircleArrowRight, MdSave as Save, MdAdd as Plus } from 'react-icons/md';
+import Header from '../../components/Header';
+import Switch from '../../components/Switch';
+import Sidebar from '../../components/Sidebar';
+import { municipiosGoias } from '../../dados/municipios';
+import '../../styles/AppAnalise.css';
+import '../../styles/indexAnalise.css';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Separator } from '../components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Label } from '../../components/ui/label';
+import { Separator } from '../../components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Link } from 'react-router-dom';
+
 
 const DadosMunicipioEResponsaveis: React.FC = () => {
   const navigate = useNavigate();
@@ -24,7 +25,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
   };
   
   const [municipio, setMunicipio] = useState<string>('');
-  const [anoProcesso, setAnoProcesso] = useState<string>('2023');
+  const [anoProcesso, setAnoProcesso] = useState<string>('2025');
   const [incluirExResponsaveis, setIncluirExResponsaveis] = useState<boolean>(false);
   const [incluirOutrosResponsaveis, setIncluirOutrosResponsaveis] = useState<boolean>(false);
   const [searchInput, setSearchInput] = useState<string>('');
@@ -54,8 +55,13 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
     }
   };
 
+  // Helper function to remove accents and convert to lowercase
+  const normalizeString = (str: string) => 
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  // Filter based on the 'nome' property, ignoring accents
   const filteredMunicipios = municipiosGoias.filter(m => 
-    m.toLowerCase().includes(searchInput.toLowerCase())
+    normalizeString(m.nome).includes(normalizeString(searchInput))
   );
 
   return (
@@ -64,18 +70,21 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
         <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center"> 
             <Header toggleSidebar={toggleSidebar} />
+
+            <div className="flex space-x-4 mr-32"> {/* Container for icons */}
+                  <Home onClick={() => navigate('/telaInicial')} className='cursor-pointer text-tribunal-blue' size={24}/>
+                  <Save className='cursor-pointer text-tribunal-blue' size={24}/>
+                  <CircleArrowRight onClick={() => navigate('/TratamentoLeis')} className='cursor-pointer text-tribunal-blue' size={26}/>
+            </div>
           </div>
 
-          <div className="min-h-screen bg-pattern bg-gray-100 py-8 px-4">
-            <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-center mb-6 text-primary">
-                  <Link to="/">
-                    <ArrowLeft className="mr-2 cursor-pointer" size={20} />
-                  </Link>
-                  <h1 className="text-xl font-bold">Dados do Município e Responsáveis</h1>
+          <div className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
+            <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden ">
+              <div className="p-6 ">
+                <div className="mb-8 text-primary text-center">
+                  <h1 className="text-2xl font-bold">Dados do Município e Responsáveis</h1>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -92,18 +101,19 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                         className="pl-10 border-gray-300"
                       />
                       <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                      {searchInput && (
+                      {searchInput && filteredMunicipios.length > 0 && ( // Added check for length > 0
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                          {filteredMunicipios.map((m) => (
+                          {/* Map over filtered municipalities and use 'nome' */}
+                          {filteredMunicipios.map((m) => ( 
                             <div
-                              key={m}
+                              key={m.codigo} // Use codigo as key for uniqueness
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                               onClick={() => {
-                                setMunicipio(m);
-                                setSearchInput(m);
+                                setMunicipio(m.nome); // Set state with nome
+                                setSearchInput(m.nome); // Update search input with nome
                               }}
                             >
-                              {m}
+                              {m.nome} {/* Display nome */}
                             </div>
                           ))}
                         </div>
@@ -112,14 +122,14 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="anoProcesso" className="text-sm font-medium text-gray-700 mb-1 block">
+                      <Label htmlFor="anoProcesso" className="text-sm font-medium text-gray-700 mb-1 block"  >
                       Ano do Processo:
                     </Label>
                     <Select value={anoProcesso} onValueChange={setAnoProcesso}>
-                      <SelectTrigger id="anoProcesso" className="w-24 border-gray-300">
+                      <SelectTrigger id="anoProcesso" className="w-24 tcmgo-dropdown">
                         <SelectValue placeholder="Selecione o ano" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="tcmgo-dropdown">
                         {anosProcesso().map((ano) => (
                           <SelectItem key={ano} value={ano}>
                             {ano}
@@ -133,7 +143,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="presidenteCamara" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="presidenteCamara" className="text-sm font-medium text-gray-700 mb-1 block"  >
                         Presidente da Câmara Atual
                       </Label>
                       <Input id="presidenteCamara" placeholder="Nome" defaultValue="CARLOS ALBERTO ALVES RABELO" className="mb-1" />
@@ -147,7 +157,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="prefeitoAtual" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="prefeitoAtual" className="text-sm font-medium text-gray-700 mb-1 block"  >
                         Prefeito(a) Atual
                       </Label>
                       <Input id="prefeitoAtual" placeholder="Nome" defaultValue="CARLOS ALBERTO ALVES RABELO" className="mb-1" />
@@ -160,7 +170,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="chefeRHCamara" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="chefeRHCamara" className="text-sm font-medium text-gray-700 mb-1 block"  >
                         Chefe de Recursos Humanos da Câmara Municipal
                       </Label>
                       <Input id="chefeRHCamara" placeholder="Nome" defaultValue="CARLOS ALBERTO ALVES RABELO" className="mb-1" />
@@ -173,7 +183,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="chefeRHPrefeitura" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="chefeRHPrefeitura" className="text-sm font-medium text-gray-700 mb-1 block"  >
                         Chefe de Recursos Humanos da Prefeitura
                       </Label>
                       <Input id="chefeRHPrefeitura" placeholder="Nome" defaultValue="CARLOS ALBERTO ALVES RABELO" className="mb-1" />
@@ -191,7 +201,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                         checked={incluirExResponsaveis} 
                         onCheckedChange={(checked) => setIncluirExResponsaveis(checked as boolean)}
                       />
-                      <Label htmlFor="incluirExResponsaveis">Incluir Ex-Responsáveis</Label>
+<Label htmlFor="incluirExResponsaveis"  >Incluir Ex-Responsáveis</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox 
@@ -199,7 +209,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                         checked={incluirOutrosResponsaveis} 
                         onCheckedChange={(checked) => setIncluirOutrosResponsaveis(checked as boolean)}
                       />
-                      <Label htmlFor="incluirOutrosResponsaveis">Incluir Outros Responsáveis</Label>
+<Label htmlFor="incluirOutrosResponsaveis"  >Incluir Outros Responsáveis</Label>
                     </div>
                   </div>
 
@@ -210,7 +220,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                   {incluirExResponsaveis && (
                     <div className="mt-6 border rounded-md p-4 bg-gray-50">
                       <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-700">Lista de Ex-Presidentes da Câmara:</h3>
+<h3 className="text-sm font-medium text-gray-700"  >Lista de Ex-Presidentes da Câmara:</h3>
                         {listaExPresidentes.map((presidente, index) => (
                           <div key={index} className="flex justify-between items-center border-b py-2">
                             <span>{presidente}</span>
@@ -222,7 +232,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                       </div>
 
                       <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-700">Lista de Ex-Prefeitos:</h3>
+<h3 className="text-sm font-medium text-gray-700"  >Lista de Ex-Prefeitos:</h3>
                         {listaExPrefeitos.map((prefeito, index) => (
                           <div key={index} className="flex justify-between items-center border-b py-2">
                             <span>{prefeito}</span>
@@ -234,7 +244,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                       </div>
 
                       <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-700">Lista de Ex-Chefes dos RH da Câmara Municipal:</h3>
+<h3 className="text-sm font-medium text-gray-700"  >Lista de Ex-Chefes dos RH da Câmara Municipal:</h3>
                         {listaExChefesRHCamara.map((chefe, index) => (
                           <div key={index} className="flex justify-between items-center border-b py-2">
                             <span>{chefe}</span>
@@ -246,7 +256,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                       </div>
 
                       <div className="mb-4">
-                        <h3 className="text-sm font-medium text-gray-700">Lista de Ex-Chefes dos RH da Prefeitura:</h3>
+<h3 className="text-sm font-medium text-gray-700"  >Lista de Ex-Chefes dos RH da Prefeitura:</h3>
                         {listaExChefesRHPrefeitura.map((chefe, index) => (
                           <div key={index} className="flex justify-between items-center border-b py-2">
                             <span>{chefe}</span>
@@ -261,17 +271,23 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
 
                   {incluirOutrosResponsaveis && (
                     <div className="mt-6 border rounded-md p-4 bg-gray-50">
-                      <h3 className="text-sm font-medium text-gray-700 mb-3">Incluir Outros Responsáveis:</h3>
+<h3 className="text-sm font-medium text-gray-700 mb-3"  >Incluir Outros Responsáveis:</h3>
                       
                       <div className="mb-3">
-                        <Label htmlFor="nomeResponsavel" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="nomeResponsavel" className="text-sm font-medium text-gray-700 mb-1 block"  >
                           Nome do Responsável
                         </Label>
+                        <Input 
+                          id="nomeResponsavel" 
+                          placeholder="Nome" 
+                          value={nomeResponsavel}
+                          onChange={(e) => setNomeResponsavel(e.target.value)}
+                        />
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
                         <div>
-                          <Label htmlFor="cpfResponsavel" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="cpfResponsavel" className="text-sm font-medium text-gray-700 mb-1 block"  >
                             CPF Responsável
                           </Label>
                           <Input 
@@ -283,7 +299,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                         </div>
                         
                         <div>
-                          <Label htmlFor="cargoResponsavel" className="text-sm font-medium text-gray-700 mb-1 block">
+<Label htmlFor="cargoResponsavel" className="text-sm font-medium text-gray-700 mb-1 block"  >
                             Cargo
                           </Label>
                           <Input 
@@ -295,7 +311,7 @@ const DadosMunicipioEResponsaveis: React.FC = () => {
                         </div>
                       </div>
                       
-                      <Button className="bg-secondary hover:bg-secondary/90 text-white" size="sm">
+                      <Button onClick={() => handleAddExResponsavel(listaExPresidentes, setListaExPresidentes)} className="bg-secondary hover:bg-secondary/90 text-white" size="sm">
                         <Plus className="h-4 w-4 mr-1" /> Incluir
                       </Button>
                     </div>

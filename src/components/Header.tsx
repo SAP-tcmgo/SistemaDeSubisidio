@@ -13,7 +13,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         <button onClick={toggleSidebar} className="p-2 rounded-md text-gray-500 hover:bg-gray-100">
           <Menu size={20} />
         </button>
-        <img src="/LogoSAP.png" alt="Logo" className="h-14 md:flex" />
+        <img src="/LogoSAP.png" alt="Logo" className="h-14 md:flex mx-auto" />
       </div>
     </header>
   );
