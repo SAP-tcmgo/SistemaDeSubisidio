@@ -1,0 +1,1 @@
+import{j as r}from"./vendor-react-EffBOMwR.js";import"./vendor-others-zbqnfhMc.js";import"./vendor-react-dom-BOOR-0bt.js";import"./vendor-firebase-4bkVwXuO.js";const a=()=>r.jsx("div",{className:"dashboard-theme",children:r.jsx("h1",{children:"Painel"})});export{a as default};

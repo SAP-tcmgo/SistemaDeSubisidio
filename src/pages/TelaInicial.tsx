@@ -6,10 +6,12 @@ import '../styles/AppConfiguracoesDashboard.css';
 import '../styles/indexConfiguracoesDashboard.css';
 import { motion } from 'framer-motion';
 import { FaSearch } from 'react-icons/fa';
+import { useDados } from '../Contexts/DadosContext';
 
 const TelaInicial = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+  const { setNumeroProcesso } = useDados();
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -58,7 +60,8 @@ const TelaInicial = () => {
                       <button className="tribunal-button w-full justify-center" onClick={() => {
                         const processNumber = (document.querySelector('input[placeholder="Número do Processo (nnnnn/aa)"]') as HTMLInputElement)?.value;
                         if (processNumber) {
-                          window.location.href = `/DadosMunicipioEResponsaveis?NrProcesso=${processNumber}`;
+                          setNumeroProcesso(processNumber);
+                          window.location.href = `/MunicipioEResponsaveis?NrProcesso=${processNumber}`;
                         }
                       }}>
                         Iniciar ou Editar
@@ -66,7 +69,8 @@ const TelaInicial = () => {
                       <button className="tribunal-button-secondary w-full justify-center" onClick={() => {
                         const processNumber = (document.querySelector('input[placeholder="Número do Processo (nnnnn/aa)"]') as HTMLInputElement)?.value;
                         if (processNumber) {
-                          window.location.href = `/DadosMunicipioEResponsaveis?NrProcesso=${processNumber}`;
+                          setNumeroProcesso(processNumber);
+                          window.location.href = `/MunicipioEResponsaveis?NrProcesso=${processNumber}`;
                         }
                       }}>
                         Consultar

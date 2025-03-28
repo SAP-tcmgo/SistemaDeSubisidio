@@ -29,6 +29,7 @@ interface DadosContextType {
   setNumeroHabitantes: (numero: number) => void;
   setLeis: (leis: string[]) => void;
   setLeisColare: (leisColare: string[]) => void;
+  resetDados: () => void;  // Função para resetar os dados
 }
 
 const DadosContext = createContext<DadosContextType | undefined>(undefined);
@@ -57,6 +58,18 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
   const [leis, setLeis] = useState<string[]>([]);
   const [leisColare, setLeisColare] = useState<string[]>([]);
 
+  // Função para resetar todos os dados
+  const resetDados = () => {
+    setNumeroProcesso('');
+    setMunicipio({ nome: '', codigo: '' });
+    setAnoProcesso('');
+    setResponsaveis([]);
+    setDoQueSeTrata([]);
+    setNumeroHabitantes(0);
+    setLeis([]);
+    setLeisColare([]);
+  };
+
   return (
     <DadosContext.Provider
       value={{
@@ -76,6 +89,7 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
         setNumeroHabitantes,
         setLeis,
         setLeisColare,
+        resetDados,  // Disponibiliza a função reset para ser usada nas telas
       }}
     >
       {children}

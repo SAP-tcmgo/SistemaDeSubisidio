@@ -81,7 +81,7 @@ const TratamentoLeis: React.FC = () => {
               <div className="flex space-x-4 mr-32"> {/* Container for icons */}
                     <Home onClick={() => navigate('/telaInicial')} className='cursor-pointer text-tribunal-blue' size={24}/>
                     <Save className='cursor-pointer text-tribunal-blue' size={24}/>
-                    <CircleArrowLeft onClick={() => navigate('/DadosMunicipioEResponsaveis')} className='cursor-pointer text-tribunal-blue' size={26}/>
+                    <CircleArrowLeft onClick={() => navigate('/MunicipioEResponsaveis')} className='cursor-pointer text-tribunal-blue' size={26}/>
                     <CircleArrowRight onClick={() => navigate('/TratamentoLeis')} className='cursor-pointer text-tribunal-blue' size={26}/>
               </div>
             </div>
@@ -89,9 +89,7 @@ const TratamentoLeis: React.FC = () => {
             <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4">
             <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
               <div className="p-6">
-<               h1 className="mb-8 text-primary text-center text-2xl font-bold">Trata-se de:</h1>
-
-                {/* Replace RadioGroup with Checkboxes */}
+                <h1 className="mb-8 text-primary text-center text-2xl font-bold">Trata-se de:</h1>
                 <div className="flex flex-wrap gap-6 mb-8">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -141,7 +139,7 @@ const TratamentoLeis: React.FC = () => {
                   <div className="border border-gray-300 rounded-md">
                     {leisInflacionarias.map((lei, index) => (
                       <div key={lei.id} className={`p-4 flex justify-between items-center ${index !== 0 ? 'border-t border-gray-300' : ''}`}>
-<span className="text-lg"  >Lei Municipal n.: {lei.numero}, art. {lei.artigo}, data base {lei.dataBase}, índice: {lei.indice}</span>
+                        <span className="text-lg"  >Lei Municipal n.: {lei.numero}, art. {lei.artigo}, data base {lei.dataBase}, índice: {lei.indice}</span>
                         <button className="text-primary hover:text-primary/80">
                           <Plus className="h-8 w-8" />
                         </button>
@@ -150,7 +148,7 @@ const TratamentoLeis: React.FC = () => {
                     <div className="p-4 border-t border-gray-300 flex items-center">
                       <button className="flex items-center space-x-2 text-primary hover:text-primary/80">
                         <Eye className="h-8 w-8" />
-<span className="text-lg font-medium"  >visualizar lista completa</span>
+                        <span className="text-lg font-medium"  >visualizar lista completa</span>
                       </button>
                     </div>
                   </div>
@@ -161,7 +159,7 @@ const TratamentoLeis: React.FC = () => {
                   <div className="border border-gray-300 rounded-md">
                     {leisEspecificas.map((lei, index) => (
                       <div key={lei.id} className={`p-4 flex justify-between items-center ${index !== 0 ? 'border-t border-gray-300' : ''}`}>
-<span className="text-lg"  >Lei Municipal n.: {lei.numero}, {lei.descricao}</span>
+                        <span className="text-lg"  >Lei Municipal n.: {lei.numero}, {lei.descricao}</span>
                         <button className="text-primary hover:text-primary/80">
                           <Plus className="h-8 w-8" />
                         </button>
