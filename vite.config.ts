@@ -19,12 +19,12 @@ export default defineConfig(({ mode }: ConfigEnv) => {
         output: {
           manualChunks(id) {
             // Split large dependencies into separate chunks
-            if (id.includes('node_modules/react/')) {
-              return 'vendor-react';
-            }
-            if (id.includes('node_modules/react-dom/')) {
-              return 'vendor-react-dom';
-            }
+            // if (id.includes('node_modules/react/')) {
+            //   return 'vendor-react';
+            // }
+            // if (id.includes('node_modules/react-dom/')) {
+            //   return 'vendor-react-dom';
+            // }
             if (id.includes('node_modules/@firebase/')) {
               return 'vendor-firebase';
             }
