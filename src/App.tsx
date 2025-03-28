@@ -20,7 +20,7 @@ const TratamentoLeis = lazy(() => import("./pages/Analise/TratamentoLeis"));
 const queryClient = new QueryClient();
 
 // Simple loading fallback component
-const LoadingFallback = () => <div>Carregando...</div>;
+const LoadingFallback = () => <div></div>;
 
 const App = () => (
   <UserProvider>
