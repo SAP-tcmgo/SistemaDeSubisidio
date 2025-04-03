@@ -10,21 +10,29 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Checkbox } from '../../components/ui/checkbox';
 import { useDados } from '../../Contexts/DadosContext';
 import { Eye } from 'lucide-react';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { toast } from '../../components/ui/use-toast';
-// Import Dialog components
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogClose, // If needed for a close button
+import { BsEraserFill } from "react-icons/bs"; // Ensure icon is imported if not already
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, // If needed for a close button
 } from '../../components/ui/dialog';
+
+// --- Utility Functions ---
+const formatCPF = (cpf: string | undefined | null): string => {
+  if (!cpf) return '';
+  const digits = cpf.replace(/\D/g, ''); // Remove non-digits
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+};
+
+const unformatCPF = (cpf: string | undefined | null): string => {
+  return cpf ? cpf.replace(/\D/g, '') : '';
+};
+
 
 // Define the structure for local state management of responsible inputs
 interface ResponsavelInput {
@@ -108,7 +116,8 @@ const MunicipioEResponsaveis: React.FC = () => {
   const [chefeRHPrefeituraInput, setChefeRHPrefeituraInput] = useState<ResponsavelInput>({ nome: '', cpf: '', incluido: false });
 
   // --- API Fetching Logic ---
-  const fetchResponsaveis = useCallback(async (codigoMunicipio: string) => {
+  // Modified to accept municipio name explicitly
+  const fetchResponsaveis = useCallback(async (codigoMunicipio: string, nomeMunicipio: string) => {
     setLoadingResponsaveis(true);
     setApiError(null);
     // Clear previous API results
@@ -122,6 +131,26 @@ const MunicipioEResponsaveis: React.FC = () => {
     setApiExChefesRHPrefeitura([]);
     // Note: We don't clear responsaveis from context here, only the local inputs/API lists
 
+    // Helper function to parse DD/MM/YYYY string to Date object
+    const parseDateString = (dateString: string | null): Date | null => {
+      if (!dateString) return null;
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        // Note: Month is 0-indexed in JavaScript Date constructor (0 = January)
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        // Basic validation for parsed numbers
+        if (!isNaN(day) && !isNaN(month) && !isNaN(year) && month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+           // Further validation could be added (e.g., days in month)
+           return new Date(Date.UTC(year, month, day)); // Use UTC to avoid timezone issues in comparisons
+        }
+      }
+      console.warn(`Invalid date format encountered: ${dateString}`); // Log invalid formats
+      return null; // Return null for invalid formats
+    };
+
+
     try {
       // Use the proxy path configured in vite.config.ts
       const response = await fetch(`/api/passaporte/${codigoMunicipio}/representacoes`);
@@ -131,25 +160,37 @@ const MunicipioEResponsaveis: React.FC = () => {
       }
       const data: RepresentacaoApi[] = await response.json();
 
-      const currentYear = new Date().getFullYear();
+      const currentDate = new Date();
+      currentDate.setUTCHours(0, 0, 0, 0); // Use UTC and set time to start of day for date-only comparison
+
       const currentResponsaveis: RepresentacaoApi[] = [];
       const exResponsaveisPotenciais: RepresentacaoApi[] = [];
 
       data.forEach(rep => {
-        const inicioAno = parseInt(rep.dataInicioRepresentacao.split('/')[2], 10);
-        const fimAno = rep.dataFinalRepresentacao ? parseInt(rep.dataFinalRepresentacao.split('/')[2], 10) : null;
+        const startDate = parseDateString(rep.dataInicioRepresentacao);
+        const endDate = parseDateString(rep.dataFinalRepresentacao);
 
-        if (inicioAno === currentYear) {
-          currentResponsaveis.push(rep);
-        } else if (fimAno && fimAno < currentYear) {
-           exResponsaveisPotenciais.push(rep);
-        } else if (!fimAno && inicioAno < currentYear) {
-            // Consider those with start date before current year and no end date as potential ex if replaced
+        if (startDate && startDate <= currentDate) { // Must have started on or before today
+          if (!endDate || endDate >= currentDate) { // Is current if no end date OR end date is today or in the future
+            currentResponsaveis.push(rep);
+          } else { // Has an end date and it's in the past
             exResponsaveisPotenciais.push(rep);
+          }
+        } else if (startDate && startDate > currentDate) {
+          // Started in the future - not current, potentially ex if they also have an end date in the past (unlikely scenario, but handle)
+          if (endDate && endDate < currentDate) {
+             exResponsaveisPotenciais.push(rep);
+          }
+          // Otherwise, ignore future-starting roles for now.
+        } else {
+          // Invalid start date - cannot determine status
+          console.warn(`Skipping representation due to invalid start date: ID ${rep.idRepresentacao}, StartDate: ${rep.dataInicioRepresentacao}`);
         }
       });
 
-       // Filter ex-responsibles: remove those who are also current responsibles for the same role
+
+       // Filter ex-responsibles: remove those who are also current responsibles for the same role/CPF combination.
+       // This prevents someone listed as current from also appearing as ex for the same role.
        const currentRespMap = new Map<string, RepresentacaoApi>();
        currentResponsaveis.forEach(cr => currentRespMap.set(`${cr.numeroCPF}-${cr.representacao}`, cr));
 
@@ -175,16 +216,29 @@ const MunicipioEResponsaveis: React.FC = () => {
          }
        }
 
+      // --- Find Current RH Chiefs with specific logic ---
+      // Use the passed nomeMunicipio argument
+      const municipioNomeUpper = nomeMunicipio.toUpperCase();
+      const expectedCamaraUG = `CÂMARA DE ${municipioNomeUpper}`;
+      const expectedPrefeituraUG = `PREFEITURA DE ${municipioNomeUpper}`;
+      const rhCargoUpper = "CHEFE DE RECURSOS HUMANOS / FOLHA DE PAGAMENTO";
 
-      const chefeRHCamaraAtual = findCurrent("CHEFE RH CÂMARA"); // Adjust if API uses different term
+      const chefeRHCamaraAtual = currentResponsaveis.find(r =>
+          r.representacao.toUpperCase() === rhCargoUpper &&
+          r.unidadeGestoraRepresentada.toUpperCase() === expectedCamaraUG
+      );
       if (chefeRHCamaraAtual) {
         setChefeRHCamaraInput(prev => ({ ...prev, nome: chefeRHCamaraAtual.representante, cpf: chefeRHCamaraAtual.numeroCPF, incluido: false }));
       }
 
-      const chefeRHPrefeituraAtual = findCurrent("CHEFE RH PREFEITURA"); // Adjust if API uses different term
+      const chefeRHPrefeituraAtual = currentResponsaveis.find(r =>
+          r.representacao.toUpperCase() === rhCargoUpper &&
+          r.unidadeGestoraRepresentada.toUpperCase() === expectedPrefeituraUG
+      );
       if (chefeRHPrefeituraAtual) {
         setChefeRHPrefeituraInput(prev => ({ ...prev, nome: chefeRHPrefeituraAtual.representante, cpf: chefeRHPrefeituraAtual.numeroCPF, incluido: false }));
       }
+
 
       // --- Populate Ex-Responsible Lists (Auxiliary State) ---
       const mapToExResponsavel = (r: RepresentacaoApi): ExResponsavel => ({
@@ -198,8 +252,15 @@ const MunicipioEResponsaveis: React.FC = () => {
 
       setApiExPresidentes(finalExResponsaveis.filter(r => r.representacao.toUpperCase() === "PRESIDENTE DA CÂMARA").map(mapToExResponsavel));
       setApiExPrefeitos(finalExResponsaveis.filter(r => r.representacao.toUpperCase() === "PREFEITO" || r.representacao.toUpperCase() === "PREFEITA").map(mapToExResponsavel));
-      setApiExChefesRHCamara(finalExResponsaveis.filter(r => r.representacao.toUpperCase() === "CHEFE RH CÂMARA").map(mapToExResponsavel)); // Adjust term if needed
-      setApiExChefesRHPrefeitura(finalExResponsaveis.filter(r => r.representacao.toUpperCase() === "CHEFE RH PREFEITURA").map(mapToExResponsavel)); // Adjust term if needed
+      // Use dynamic municipio name for filtering Ex RH Chiefs
+      setApiExChefesRHCamara(finalExResponsaveis.filter(r =>
+          r.representacao.toUpperCase() === rhCargoUpper &&
+          r.unidadeGestoraRepresentada.toUpperCase() === expectedCamaraUG
+      ).map(mapToExResponsavel));
+      setApiExChefesRHPrefeitura(finalExResponsaveis.filter(r =>
+          r.representacao.toUpperCase() === rhCargoUpper &&
+          r.unidadeGestoraRepresentada.toUpperCase() === expectedPrefeituraUG
+      ).map(mapToExResponsavel));
 
 
     } catch (error) {
@@ -217,8 +278,9 @@ const MunicipioEResponsaveis: React.FC = () => {
 
   // Effect to fetch data when municipio changes
   useEffect(() => {
-    if (municipio && municipio.codigo) {
-      fetchResponsaveis(municipio.codigo);
+    // Ensure both codigo and nome are present before fetching
+    if (municipio && municipio.codigo && municipio.nome) {
+      fetchResponsaveis(municipio.codigo, municipio.nome); // Pass both code and name
     } else {
       // Clear fields if no municipio is selected
        setPresidenteInput({ nome: '', cpf: '', incluido: false });
@@ -410,6 +472,39 @@ const MunicipioEResponsaveis: React.FC = () => {
      // Optionally add a toast notification here if desired later
   };
 
+  // --- Clear Screen Function ---
+  const handleClearScreen = () => {
+    // Reset context state
+    setMunicipio({ nome: '', codigo: '' }); // Reset to initial state object
+    setAnoProcesso(''); // Or your initial state for anoProcesso
+    setResponsaveis([]); // Clear the list of responsaveis in context
+
+    // Reset local state
+    setSearchInput('');
+    setIncluirExResponsaveis(false);
+    setIncluirOutrosResponsaveis(false);
+    setOutroNome('');
+    setOutroCpf('');
+    setOutroCargo('');
+    setPresidenteInput({ nome: '', cpf: '', incluido: false });
+    setPrefeitoInput({ nome: '', cpf: '', incluido: false });
+    setChefeRHCamaraInput({ nome: '', cpf: '', incluido: false });
+    setChefeRHPrefeituraInput({ nome: '', cpf: '', incluido: false });
+    setApiExPresidentes([]);
+    setApiExPrefeitos([]);
+    setApiExChefesRHCamara([]);
+    setApiExChefesRHPrefeitura([]);
+    setAddedExResponsavelIds(new Set());
+    setApiError(null);
+    setIsViewModalOpen(false); // Close modal if open
+
+    // Optional: Show a confirmation toast
+    toast({
+      title: "Tela Limpa",
+      description: "Todos os campos foram redefinidos.",
+    });
+  };
+
 
   return (
     <div className="municipios-theme flex min-h-screen flex-col bg-gray-50">
@@ -429,6 +524,7 @@ const MunicipioEResponsaveis: React.FC = () => {
 
                   <div className="absolute top-0 right-0 h-full flex items-center space-x-4 ">
                     <Home onClick={() => navigate('/telaInicial')} className='cursor-pointer text-tribunal-blue' size={24}/>
+                    <BsEraserFill onClick={handleClearScreen} className='cursor-pointer text-tribunal-blue' size={22} title="Limpar Tela"/> {/* Added Eraser Icon */}
                     <Save className='cursor-pointer text-tribunal-blue' size={24}/>
                     <CircleArrowRight onClick={() => navigate('/TratamentoLeis')} className='cursor-pointer text-tribunal-blue' size={26}/>
                   </div>
@@ -481,28 +577,24 @@ const MunicipioEResponsaveis: React.FC = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="anoProcesso" className="text-sm font-medium text-gray-700 mb-1 block">
-                      Ano do Processo:
+                    <Label htmlFor="periodoProcesso" className="text-sm font-medium text-gray-700 mb-1 block">
+                      Período:
                     </Label>
-                    <Select value={anoProcesso} onValueChange={(value) => setAnoProcesso(String(value))}>
-                      <SelectTrigger id="anoProcesso" className="w-24 tcmgo-dropdown">
-                        <SelectValue placeholder="Ano" />
-                      </SelectTrigger>
-                      <SelectContent className="tcmgo-dropdown bg-white text-gray-700">
-                        {anosProcesso().map((ano) => (
-                          <SelectItem key={ano} value={ano} className="focus:bg-gray-100 focus:text-gray-700">
-                            {ano}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      type="text"
+                      id="periodoProcesso"
+                      placeholder="Período"
+                      value={anoProcesso}
+                      onChange={(e) => setAnoProcesso(e.target.value)}
+                      className="w-24 tcmgo-input"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="prefeitoNome" className="text-sm font-medium text-gray-700 mb-1 block">
-                        Prefeito(a) Atual
+                        Presidente da Câmara Atual
                       </Label>
                       <Input
                         id="presidenteCamaraNome"
@@ -514,12 +606,17 @@ const MunicipioEResponsaveis: React.FC = () => {
                         disabled={!presidenteInput.incluido && !presidenteInput.nome} // Disable if switch off AND no name (i.e. not API populated)
                       />
                     </div>
-                    <div className="flex items-center space-x-2 mt-7">
+                    <div className="flex items-center space-x-2 mt-5">
                       <Input
                         id="presidenteCamaraCpf"
                         placeholder="CPF"
-                        value={presidenteInput.cpf}
-                        onChange={(e) => setPresidenteInput({ ...presidenteInput, cpf: e.target.value })}
+                        value={formatCPF(presidenteInput.cpf)} // Display formatted
+                        onChange={(e) => {
+                          const rawCpf = unformatCPF(e.target.value);
+                          if (rawCpf.length <= 11) { // Limit to 11 digits
+                            setPresidenteInput({ ...presidenteInput, cpf: rawCpf }); // Store raw digits
+                          }
+                        }}
                         className="w-32 tcmgo-input"
                         disabled={!presidenteInput.incluido && !presidenteInput.cpf} // Disable if switch off AND no cpf
                       />
@@ -532,6 +629,10 @@ const MunicipioEResponsaveis: React.FC = () => {
 
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  </div>
+
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5">
                     <div>
                       <Label htmlFor="prefeitoNome" className="text-sm font-medium text-gray-700 mb-1 block">
                         Prefeito(a) Atual
@@ -545,12 +646,17 @@ const MunicipioEResponsaveis: React.FC = () => {
                         disabled={!prefeitoInput.incluido && !prefeitoInput.nome}
                       />
                     </div>
-                    <div className="flex items-center space-x-2 mt-7">
+                    <div className="flex items-center space-x-2 mt-5">
                       <Input
                         id="prefeitoCpf"
                         placeholder="CPF"
-                        value={prefeitoInput.cpf}
-                        onChange={(e) => setPrefeitoInput({ ...prefeitoInput, cpf: e.target.value })}
+                        value={formatCPF(prefeitoInput.cpf)} // Display formatted
+                        onChange={(e) => {
+                          const rawCpf = unformatCPF(e.target.value);
+                           if (rawCpf.length <= 11) {
+                             setPrefeitoInput({ ...prefeitoInput, cpf: rawCpf }); // Store raw digits
+                           }
+                        }}
                         className="w-32 tcmgo-input"
                         disabled={!prefeitoInput.incluido && !prefeitoInput.cpf}
                       />
@@ -561,7 +667,7 @@ const MunicipioEResponsaveis: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5">
                     <div>
                       <Label htmlFor="chefeRHCamaraNome" className="text-sm font-medium text-gray-700 mb-1 block">
                         Chefe do RH da Câmara Municipal
@@ -575,12 +681,17 @@ const MunicipioEResponsaveis: React.FC = () => {
                           disabled={!chefeRHCamaraInput.incluido && !chefeRHCamaraInput.nome}
                       />
                     </div>
-                    <div className="flex items-center space-x-2 mt-7">
+                    <div className="flex items-center space-x-2 mt-5">
                       <Input
                         id="chefeRHCamaraCpf"
                         placeholder="CPF"
-                        value={chefeRHCamaraInput.cpf}
-                        onChange={(e) => setChefeRHCamaraInput({ ...chefeRHCamaraInput, cpf: e.target.value })}
+                        value={formatCPF(chefeRHCamaraInput.cpf)} // Display formatted
+                        onChange={(e) => {
+                          const rawCpf = unformatCPF(e.target.value);
+                           if (rawCpf.length <= 11) {
+                            setChefeRHCamaraInput({ ...chefeRHCamaraInput, cpf: rawCpf }); // Store raw digits
+                           }
+                        }}
                         className="w-32 tcmgo-input"
                           disabled={!chefeRHCamaraInput.incluido && !chefeRHCamaraInput.cpf}
                       />
@@ -591,7 +702,7 @@ const MunicipioEResponsaveis: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-5">
                     <div>
                       <Label htmlFor="chefeRHPrefeituraNome" className="text-sm font-medium text-gray-700 mb-1 block">
                         Chefe do RH da Prefeitura
@@ -605,12 +716,17 @@ const MunicipioEResponsaveis: React.FC = () => {
                         disabled={!chefeRHPrefeituraInput.incluido && !chefeRHPrefeituraInput.nome}
                       />
                     </div>
-                    <div className="flex items-center space-x-2 mt-7">
+                    <div className="flex items-center space-x-2 mt-5">
                       <Input
                         id="chefeRHPrefeituraCpf"
                         placeholder="CPF"
-                        value={chefeRHPrefeituraInput.cpf}
-                        onChange={(e) => setChefeRHPrefeituraInput({ ...chefeRHPrefeituraInput, cpf: e.target.value })}
+                        value={formatCPF(chefeRHPrefeituraInput.cpf)} // Display formatted
+                        onChange={(e) => {
+                          const rawCpf = unformatCPF(e.target.value);
+                           if (rawCpf.length <= 11) {
+                            setChefeRHPrefeituraInput({ ...chefeRHPrefeituraInput, cpf: rawCpf }); // Store raw digits
+                           }
+                        }}
                         className="w-32 tcmgo-input"
                         disabled={!chefeRHPrefeituraInput.incluido && !chefeRHPrefeituraInput.cpf}
                       />
@@ -662,7 +778,8 @@ const MunicipioEResponsaveis: React.FC = () => {
                                 <div key={`${resp.cpf}-${resp.cargo}-${index}`} className="border border-gray-300 p-2 rounded mb-2 flex justify-between items-center text-sm">
                                   <div>
                                     <p className="font-medium">{resp.nome}</p>
-                                    <p className="text-gray-600">{resp.cargo} - CPF: {resp.cpf}</p>
+                                    {/* Display formatted CPF in modal */}
+                                    <p className="text-gray-600">{resp.cargo} - CPF: {formatCPF(resp.cpf)}</p>
                                   </div>
                                   <Button
                                     variant="ghost"
@@ -693,12 +810,14 @@ const MunicipioEResponsaveis: React.FC = () => {
                         <div className="w-[calc(50%-1rem)] mb-4 mr-4">
                           <h4 className="font-medium text-gray-600 text-sm mb-1">Ex-Presidentes da Câmara:</h4>
                           <ScrollArea className="h-40 w-full rounded-md border p-2 bg-white">
-                            <div className="grid grid-cols-2 gap-2 !important">
+                            {/* Removed grid classes from the inner div */}
+                            <div>
                               {apiExPresidentes.length > 0 ? apiExPresidentes.map((resp) => {
                                 const isAdded = addedExResponsavelIds.has(resp.id);
                                 const cargoContext = `Ex-${resp.cargo}`;
                                 return (
-                                  <div key={resp.id} className={`flex justify-between items-center py-1 text-sm ${isAdded ? 'bg-green-100' : ''}`}>
+                                  // Added border, padding, margin, rounded corners
+                                  <div key={resp.id} className={`border border-gray-300 rounded-md p-2 mb-2 flex justify-between items-center text-sm ${isAdded ? 'bg-green-100' : ''}`}>
                                     <span>{resp.nome} ({resp.dataInicio} - {resp.dataFim || 'Atual'})</span>
                                     <Button
                                       variant="ghost"
@@ -719,12 +838,14 @@ const MunicipioEResponsaveis: React.FC = () => {
                         <div className="w-[calc(50%-1rem)] mb-4 mr-4">
                           <h4 className="font-medium text-gray-600 text-sm mb-1">Ex-Prefeitos(as):</h4>
                           <ScrollArea className="h-40 w-full rounded-md border p-2 bg-white">
-                            <div className="grid grid-cols-2 gap-2 !important">
+                            {/* Removed grid classes from the inner div */}
+                            <div>
                               {apiExPrefeitos.length > 0 ? apiExPrefeitos.map((resp) => {
                                 const isAdded = addedExResponsavelIds.has(resp.id);
                                 const cargoContext = `Ex-${resp.cargo}`;
                                 return (
-                                  <div key={resp.id} className={`flex justify-between items-center py-1 text-sm ${isAdded ? 'bg-green-100' : ''}`}>
+                                  // Added border, padding, margin, rounded corners
+                                  <div key={resp.id} className={`border border-gray-300 rounded-md p-2 mb-2 flex justify-between items-center text-sm ${isAdded ? 'bg-green-100' : ''}`}>
                                     <span>{resp.nome} ({resp.dataInicio} - {resp.dataFim || 'Atual'})</span>
                                     <Button
                                       variant="ghost"
@@ -745,12 +866,14 @@ const MunicipioEResponsaveis: React.FC = () => {
                         <div className="w-[calc(50%-1rem)] mb-4 mr-4">
                           <h4 className="font-medium text-gray-600 text-sm mb-1">Ex-Chefes RH Câmara:</h4>
                           <ScrollArea className="h-40 w-full rounded-md border p-2 bg-white">
-                            <div className="grid grid-cols-2 gap-2 !important">
+                            {/* Removed grid classes from the inner div */}
+                            <div>
                               {apiExChefesRHCamara.length > 0 ? apiExChefesRHCamara.map((resp) => {
                                 const isAdded = addedExResponsavelIds.has(resp.id);
                                 const cargoContext = `Ex-${resp.cargo}`;
                                 return (
-                                  <div key={resp.id} className={`flex justify-between items-center py-1 text-sm ${isAdded ? 'bg-green-100' : ''}`}>
+                                  // Added border, padding, margin, rounded corners
+                                  <div key={resp.id} className={`border border-gray-300 rounded-md p-2 mb-2 flex justify-between items-center text-sm ${isAdded ? 'bg-green-100' : ''}`}>
                                     <span>{resp.nome} ({resp.dataInicio} - {resp.dataFim || 'Atual'})</span>
                                     <Button
                                       variant="ghost"
@@ -771,12 +894,14 @@ const MunicipioEResponsaveis: React.FC = () => {
                         <div className="w-[calc(50%-1rem)] mb-4 mr-4">
                           <h4 className="font-medium text-gray-600 text-sm mb-1">Ex-Chefes RH Prefeitura:</h4>
                           <ScrollArea className="h-40 w-full rounded-md border p-2 bg-white">
-                            <div className="grid grid-cols-2 gap-2 !important">
+                            {/* Removed grid classes from the inner div */}
+                            <div>
                               {apiExChefesRHPrefeitura.length > 0 ? apiExChefesRHPrefeitura.map((resp) => {
                                 const isAdded = addedExResponsavelIds.has(resp.id);
                                 const cargoContext = `Ex-${resp.cargo}`;
                                 return (
-                                  <div key={resp.id} className={`flex justify-between items-center py-1 text-sm ${isAdded ? 'bg-green-100' : ''}`}>
+                                  // Added border, padding, margin, rounded corners
+                                  <div key={resp.id} className={`border border-gray-300 rounded-md p-2 mb-2 flex justify-between items-center text-sm ${isAdded ? 'bg-green-100' : ''}`}>
                                     <span>{resp.nome} ({resp.dataInicio} - {resp.dataFim || 'Atual'})</span>
                                     <Button
                                       variant="ghost"
@@ -802,7 +927,7 @@ const MunicipioEResponsaveis: React.FC = () => {
                   <div className="mt-6 border rounded-md p-4 bg-gray-50">
                     <h3 className="font-medium text-gray-700 mb-3">Incluir Outros Responsáveis</h3>
 
-                    <div className="mb-3">
+                    <div className="mb-3 w-[42.5%]">
                       <Label htmlFor="outroNome" className="text-sm font-medium text-gray-700 mb-1 block">
                         Nome do Responsável
                       </Label>
@@ -822,8 +947,13 @@ const MunicipioEResponsaveis: React.FC = () => {
                       <Input
                         id="outroCpf"
                         placeholder="CPF"
-                        value={outroCpf}
-                        onChange={(e) => setOutroCpf(e.target.value)}
+                        value={formatCPF(outroCpf)} // Display formatted
+                        onChange={(e) => {
+                          const rawCpf = unformatCPF(e.target.value);
+                           if (rawCpf.length <= 11) {
+                            setOutroCpf(rawCpf); // Store raw digits
+                           }
+                        }}
                       />
                     </div>
 
