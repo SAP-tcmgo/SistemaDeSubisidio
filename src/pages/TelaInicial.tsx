@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import WelcomeSection from '../components/WelcomeSection';
@@ -10,7 +11,25 @@ import { useDados } from '../Contexts/DadosContext';
 
 const TelaInicial = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { setNumeroProcesso } = useDados();
+  const [processoInput, setProcessoInput] = useState(''); // State for input
+  const { setNumeroProcesso, loadAnaliseData } = useDados(); // Get loadAnaliseData
+  const navigate = useNavigate(); // Hook for navigation
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setProcessoInput(event.target.value);
+  };
+
+  const handleNavigation = async () => {
+    if (processoInput) {
+      setNumeroProcesso(processoInput); // Set the process number in context
+      await loadAnaliseData(processoInput); // Load data from Firebase
+      navigate(`/MunicipioEResponsaveis?NrProcesso=${processoInput}`); // Navigate
+    } else {
+      // Optionally handle the case where the input is empty
+      console.warn("Número do processo não inserido.");
+      // You might want to show a message to the user here
+    }
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -42,6 +61,8 @@ const TelaInicial = () => {
                       <input
                         type="text"
                         placeholder="Número do Processo (nnnnn/aa)"
+                        value={processoInput} // Bind value to state
+                        onChange={handleInputChange} // Handle changes
                         className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring focus:border-blue-300"
                       />
                       <div className="absolute inset-y-0 right-3 flex items-center">
@@ -57,22 +78,17 @@ const TelaInicial = () => {
                   </div>
                   <div className="w-1/2 pl-4">
                     <div className="space-y-3">
-                      <button className="tribunal-button w-full justify-center" onClick={() => {
-                        const processNumber = (document.querySelector('input[placeholder="Número do Processo (nnnnn/aa)"]') as HTMLInputElement)?.value;
-                        if (processNumber) {
-                          setNumeroProcesso(processNumber);
-                          window.location.href = `/MunicipioEResponsaveis?NrProcesso=${processNumber}`;
-                        }
-                      }}>
+                      {/* Use the shared handler for both buttons */}
+                      <button
+                        className="tribunal-button w-full justify-center"
+                        onClick={handleNavigation}
+                      >
                         Iniciar ou Editar
                       </button>
-                      <button className="tribunal-button-secondary w-full justify-center" onClick={() => {
-                        const processNumber = (document.querySelector('input[placeholder="Número do Processo (nnnnn/aa)"]') as HTMLInputElement)?.value;
-                        if (processNumber) {
-                          setNumeroProcesso(processNumber);
-                          window.location.href = `/MunicipioEResponsaveis?NrProcesso=${processNumber}`;
-                        }
-                      }}>
+                      <button
+                        className="tribunal-button-secondary w-full justify-center"
+                        onClick={handleNavigation}
+                      >
                         Consultar
                       </button>
                       <button className="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-6 rounded-md w-full transition-all duration-300 hover:bg-gray-50">

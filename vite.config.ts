@@ -9,7 +9,22 @@ export default defineConfig(({ mode }: ConfigEnv) => {
     base: './',
     server: {
       port: 8080,
-      allowedHosts: ["ccf92518-8ebc-4caa-9a0c-a6500ae49816.lovableproject.com"]
+      allowedHosts: ["ccf92518-8ebc-4caa-9a0c-a6500ae49816.lovableproject.com"],
+      // Add proxy configuration here
+      proxy: {
+        // Proxy requests from /api/colare to the target API
+        '/api/colare': {
+          target: 'http://ws.tcm.go.gov.br/api/rest/colareService', // Target API base URL
+          changeOrigin: true, // Needed for virtual hosted sites
+          rewrite: (path) => path.replace(/^\/api\/colare/, ''), // Remove the /api/colare prefix before forwarding
+        },
+        // Add proxy for passaporteService
+        '/api/passaporte': {
+          target: 'http://ws.tcm.go.gov.br/api/rest/passaporteService', // Target API base URL
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/passaporte/, ''), // Remove the /api/passaporte prefix
+        },
+      },
     },
     build: {
       rollupOptions: {

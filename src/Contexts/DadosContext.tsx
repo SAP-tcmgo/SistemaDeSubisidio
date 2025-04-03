@@ -1,5 +1,7 @@
 // src/context/DadosContext.tsx
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase'; // Assuming your firebase config is exported from here
 
 interface Responsavel {
   nome: string;
@@ -12,6 +14,12 @@ interface Municipio {
   codigo: string;
 }
 
+// New interface for the structure of included Colare laws
+export interface LeiIncluida {
+  id: number; // idEnvioColare from the original API object
+  text: string; // Formatted law string
+}
+
 interface DadosContextType {
   numeroProcesso: string;
   municipio: Municipio;
@@ -20,16 +28,17 @@ interface DadosContextType {
   doQueSeTrata: string[];
   numeroHabitantes: number;
   leis: string[];
-  leisColare: string[];
-  setNumeroProcesso: (numero: string) => void;
-  setMunicipio: (municipio: Municipio) => void;
-  setAnoProcesso: (ano: string) => void;
-  setResponsaveis: (responsaveis: Responsavel[]) => void;
-  setDoQueSeTrata: (doQueSeTrata: string[]) => void;
-  setNumeroHabitantes: (numero: number) => void;
-  setLeis: (leis: string[]) => void;
-  setLeisColare: (leisColare: string[]) => void;
-  resetDados: () => void;  // Função para resetar os dados
+  leisColare: LeiIncluida[]; // Use the new interface
+  loadAnaliseData: (numeroProcesso: string) => Promise<void>; // Function to load data
+  setNumeroProcesso: React.Dispatch<React.SetStateAction<string>>;
+  setMunicipio: React.Dispatch<React.SetStateAction<Municipio>>;
+  setAnoProcesso: React.Dispatch<React.SetStateAction<string>>;
+  setResponsaveis: React.Dispatch<React.SetStateAction<Responsavel[]>>;
+  setDoQueSeTrata: React.Dispatch<React.SetStateAction<string[]>>;
+  setNumeroHabitantes: React.Dispatch<React.SetStateAction<number>>;
+  setLeis: React.Dispatch<React.SetStateAction<string[]>>;
+  setLeisColare: React.Dispatch<React.SetStateAction<LeiIncluida[]>>; // Use the new interface
+  resetDados: () => void; // Função para resetar os dados
 }
 
 const DadosContext = createContext<DadosContextType | undefined>(undefined);
@@ -56,10 +65,10 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
   const [doQueSeTrata, setDoQueSeTrata] = useState<string[]>([]);
   const [numeroHabitantes, setNumeroHabitantes] = useState(0);
   const [leis, setLeis] = useState<string[]>([]);
-  const [leisColare, setLeisColare] = useState<string[]>([]);
+  const [leisColare, setLeisColare] = useState<LeiIncluida[]>([]); // Use the new interface
 
   // Função para resetar todos os dados
-  const resetDados = () => {
+  const resetDados = useCallback(() => {
     setNumeroProcesso('');
     setMunicipio({ nome: '', codigo: '' });
     setAnoProcesso('');
@@ -68,7 +77,49 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
     setNumeroHabitantes(0);
     setLeis([]);
     setLeisColare([]);
-  };
+  }, []);
+
+  // Função para carregar dados da análise do Firebase
+  const loadAnaliseData = useCallback(async (numeroProc: string) => {
+    if (!numeroProc) {
+      console.log("Número do processo não fornecido, resetando dados.");
+      resetDados(); // Reseta se não houver número de processo
+      setNumeroProcesso(''); // Garante que numeroProcesso seja limpo
+      return;
+    }
+
+    console.log(`Tentando carregar dados para o processo: ${numeroProc}`);
+    const docRef = doc(db, 'analise', numeroProc); // Referência ao documento na coleção 'analise'
+    try {
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        console.log("Documento encontrado:", docSnap.data());
+        const data = docSnap.data();
+        // Atualiza todos os estados com os dados do Firebase
+        setNumeroProcesso(numeroProc); // Mantém o número do processo atual
+        setMunicipio(data.municipio || { nome: '', codigo: '' });
+        setAnoProcesso(data.anoProcesso || '');
+        setResponsaveis(data.responsaveis || []);
+        setDoQueSeTrata(data.doQueSeTrata || []);
+        setNumeroHabitantes(data.numeroHabitantes || 0);
+        setLeis(data.leis || []);
+        // Ensure loaded data conforms to the new structure or provide default
+        setLeisColare(Array.isArray(data.leisColare) ? data.leisColare.map((item: any) => ({ id: item?.id ?? 0, text: item?.text ?? '' })) : []);
+        // Adicione outros setters conforme necessário se houver mais campos
+      } else {
+        // Documento não encontrado, reseta os dados exceto o número do processo
+        console.log("Nenhum documento encontrado para o processo:", numeroProc);
+        resetDados();
+        setNumeroProcesso(numeroProc); // Mantém o número do processo que foi buscado
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados da análise:", error);
+      // Em caso de erro, reseta os dados para evitar inconsistências
+      resetDados();
+      setNumeroProcesso(numeroProc); // Mantém o número do processo
+    }
+  }, [resetDados]); // Inclui resetDados nas dependências
 
   return (
     <DadosContext.Provider
@@ -89,7 +140,8 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
         setNumeroHabitantes,
         setLeis,
         setLeisColare,
-        resetDados,  // Disponibiliza a função reset para ser usada nas telas
+        loadAnaliseData, // Disponibiliza a função de carregamento
+        resetDados, // Disponibiliza a função reset para ser usada nas telas
       }}
     >
       {children}
