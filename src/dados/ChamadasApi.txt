@@ -1,36 +1,38 @@
 API PARA POPULAÇÃO
-so funciona de 2022 pra trás
 
-https://apisidra.ibge.gov.br/values/t/4714/n6/COD_MUNICIPIO/v/93/p/2022
+https://apisidra.ibge.gov.br/values/t/6579/n6/COD_MUNICIPIO/v/9324/p/last
+
 
 [
-  {
-    "NC": "Nível Territorial (Código)",
-    "NN": "Nível Territorial",
-    "MC": "Unidade de Medida (Código)",
-    "MN": "Unidade de Medida",
-    "V": "Valor",
-    "D1C": "Município (Código)",
-    "D1N": "Município",
-    "D2C": "Variável (Código)",
-    "D2N": "Variável",
-    "D3C": "Ano (Código)",
-    "D3N": "Ano"
-  },
-  {
-    "NC": "6",
-    "NN": "Município",
-    "MC": "45",
-    "MN": "Pessoas",
-    "V": "5815", //NUMERO DE HABITANTES
-    "D1C": "5222302",
-    "D1N": "Vila Propício (GO)",
-    "D2C": "93",
-    "D2N": "População residente",
-    "D3C": "2022",
-    "D3N": "2022"
-  }
+    {
+        "NC": "Nível Territorial (Código)",
+        "NN": "Nível Territorial",
+        "MC": "Unidade de Medida (Código)",
+        "MN": "Unidade de Medida",
+        "V": "Valor",
+        "D1C": "Município (Código)",
+        "D1N": "Município",
+        "D2C": "Variável (Código)",
+        "D2N": "Variável",
+        "D3C": "Ano (Código)",
+        "D3N": "Ano"
+    },
+    {
+        "NC": "6",
+        "NN": "Município",
+        "MC": "45",
+        "MN": "Pessoas",
+        "V": "1494599",
+        "D1C": "5208707",
+        "D1N": "Goiânia (GO)",
+        "D2C": "9324",
+        "D2N": "População residente estimada",
+        "D3C": "2024",
+        "D3N": "2024"
+    }
 ]
+
+
 
 --------------------------------------
 

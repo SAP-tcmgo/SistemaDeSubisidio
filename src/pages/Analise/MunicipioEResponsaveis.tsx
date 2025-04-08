@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
-import { MdSearch as Search, MdHome as Home, MdOutlineArrowCircleRight as CircleArrowRight, MdSave as Save, MdAdd as Plus, MdDelete as Delete, MdRemoveCircleOutline as RemoveIcon } from 'react-icons/md'; // Added RemoveIcon
+import React, { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
+import { MdSearch as Search, MdAdd as Plus, MdDelete as Delete, MdRemoveCircleOutline as RemoveIcon } from 'react-icons/md'; // Removed Home, CircleArrowRight, Save
 import Header from '../../components/Header';
 import Switch from '../../components/Switch';
 import Sidebar from '../../components/Sidebar';
+import Icons from '../../components/Icons';
 import { municipiosGoias } from '../../dados/municipios';
 import '../../styles/AppAnalise.css';
 import '../../styles/indexAnalise.css';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom'; // Removed Link
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -15,9 +16,8 @@ import { useDados } from '../../Contexts/DadosContext';
 import { Eye } from 'lucide-react';
 import { ScrollArea } from '../../components/ui/scroll-area';
 import { toast } from '../../components/ui/use-toast';
-import { BsEraserFill } from "react-icons/bs"; // Ensure icon is imported if not already
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose, // If needed for a close button
-} from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import BreadcrumbNav from '../../components/BreadcrumbNav'; // Import the new component
 
 // --- Utility Functions ---
 const formatCPF = (cpf: string | undefined | null): string => {
@@ -71,6 +71,7 @@ const MunicipioEResponsaveis: React.FC = () => {
   const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const lastFetchedMunicipioCodigoRef = useRef<string | null>(null); // Ref to track last fetched municipio
 
   // Get state and setters from context
   const {
@@ -88,9 +89,7 @@ const MunicipioEResponsaveis: React.FC = () => {
   const [apiExPrefeitos, setApiExPrefeitos] = useState<ExResponsavel[]>([]);
   const [apiExChefesRHCamara, setApiExChefesRHCamara] = useState<ExResponsavel[]>([]);
   const [apiExChefesRHPrefeitura, setApiExChefesRHPrefeitura] = useState<ExResponsavel[]>([]);
-  // Add state for other ex-roles if needed from API
 
-  // State to track which ex-responsibles (by idRepresentacao) are added to the context
   const [addedExResponsavelIds, setAddedExResponsavelIds] = useState<Set<number>>(new Set());
 
   const toggleSidebar = () => {
@@ -262,6 +261,8 @@ const MunicipioEResponsaveis: React.FC = () => {
           r.unidadeGestoraRepresentada.toUpperCase() === expectedPrefeituraUG
       ).map(mapToExResponsavel));
 
+      // On successful fetch, update the ref
+      lastFetchedMunicipioCodigoRef.current = codigoMunicipio;
 
     } catch (error) {
       console.error("Erro ao buscar responsáveis:", error);
@@ -280,9 +281,12 @@ const MunicipioEResponsaveis: React.FC = () => {
   useEffect(() => {
     // Ensure both codigo and nome are present before fetching
     if (municipio && municipio.codigo && municipio.nome) {
-      fetchResponsaveis(municipio.codigo, municipio.nome); // Pass both code and name
+      // Fetch only if the codigo is different from the last fetched one
+      if (municipio.codigo !== lastFetchedMunicipioCodigoRef.current) {
+        fetchResponsaveis(municipio.codigo, municipio.nome);
+      }
     } else {
-      // Clear fields if no municipio is selected
+      // Clear fields and reset ref if no municipio is selected
        setPresidenteInput({ nome: '', cpf: '', incluido: false });
        setPrefeitoInput({ nome: '', cpf: '', incluido: false });
        setChefeRHCamaraInput({ nome: '', cpf: '', incluido: false });
@@ -292,8 +296,10 @@ const MunicipioEResponsaveis: React.FC = () => {
        setApiExChefesRHCamara([]);
        setApiExChefesRHPrefeitura([]);
        setAddedExResponsavelIds(new Set()); // Clear added ex-responsaveis tracking
+       lastFetchedMunicipioCodigoRef.current = null; // Reset ref
     }
-  }, [municipio, fetchResponsaveis]); // Depend on municipio object and the fetch function
+    // Dependency array: only re-run if municipio object changes or fetchResponsaveis changes (due to useCallback dependencies)
+  }, [municipio, fetchResponsaveis]);
 
    // Effect to synchronize addedExResponsavelIds with the context state
    useEffect(() => {
@@ -505,6 +511,19 @@ const MunicipioEResponsaveis: React.FC = () => {
     });
   };
 
+  // --- Icon Click Handlers ---
+  const handleErase = () => {
+    handleClearScreen(); // Reuse the existing clear logic
+  };
+
+  const handleBack = () => {
+    navigate('/telaInicial');
+  };
+
+  const handleNext = () => {
+    navigate('/TratamentoLeis');
+  };
+
 
   return (
     <div className="municipios-theme flex min-h-screen flex-col bg-gray-50">
@@ -516,22 +535,26 @@ const MunicipioEResponsaveis: React.FC = () => {
             <Header toggleSidebar={toggleSidebar} />
           </div>
 
-          <div className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
+          {/* Use the new BreadcrumbNav component */}
+          <BreadcrumbNav currentPage="Município e Responsáveis" sidebarOpen={sidebarOpen} />
+
+          <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
             <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden ">
               <div className="p-6 ">
-                <div className="relative mb-8 text-primary text-center">
-                  <h1 className="text-2xl font-bold">Dados do Município e Responsáveis {numeroProcesso && `(${numeroProcesso})`}</h1>
-
-                  <div className="absolute top-0 right-0 h-full flex items-center space-x-4 ">
-                    <Home onClick={() => navigate('/telaInicial')} className='cursor-pointer text-tribunal-blue' size={24}/>
-                    <BsEraserFill onClick={handleClearScreen} className='cursor-pointer text-tribunal-blue' size={22} title="Limpar Tela"/> {/* Added Eraser Icon */}
-                    <Save className='cursor-pointer text-tribunal-blue' size={24}/>
-                    <CircleArrowRight onClick={() => navigate('/TratamentoLeis')} className='cursor-pointer text-tribunal-blue' size={26}/>
-                  </div>
-
+                <div className="mt-[-20px] flex justify-end">
+                      <Icons
+                        onEraseClick={handleErase}
+                        onBackClick={handleBack}
+                        onNextClick={handleNext}
+                        // onSaveClick is omitted as it does nothing yet
+                      />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="relative mb-8 text-primary text-center">
+                  <h1 className="text-2xl font-bold text-center mb-4 mt-[-20px]">Município e Responsáveis {numeroProcesso && `(${numeroProcesso})`}</h1>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 mb-6"> {/* Added mt-6 */}
                   <div>
                     <Label htmlFor="municipio" className="text-sm font-medium text-gray-700 mb-1 block">
                       Município
@@ -759,11 +782,10 @@ const MunicipioEResponsaveis: React.FC = () => {
                     <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
                     <DialogTrigger asChild className="ml-auto">
                          <div className="pt-4 flex items-center text-sm">
-                           <button
-                             className="flex items-center space-x-2 text-primary hover:text-primary/80">
-                             <Eye className="h-5 w-5" />
-                             <span className="font-medium"> Visualizar responsáveis incluídos</span>
-                           </button>
+                          <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-primary/10">
+                            <Eye className="h-4 w-4 mr-1" />
+                            Visualizar Resposáveis Incluídos
+                          </Button>
                          </div>
                        </DialogTrigger>
                        <DialogContent className="sm:max-w-[600px] bg-white"> 
@@ -977,7 +999,7 @@ const MunicipioEResponsaveis: React.FC = () => {
                 )}
               </div>
             </div>
-          </div>
+          </main>
         </div>
       </div>
     </div>

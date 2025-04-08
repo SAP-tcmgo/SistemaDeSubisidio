@@ -16,6 +16,8 @@ const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Painel = lazy(() => import("./pages/Painel"));
 const DadosMunicipioEResponsaveis = lazy(() => import("./pages/Analise/MunicipioEResponsaveis"));
 const TratamentoLeis = lazy(() => import("./pages/Analise/TratamentoLeis"));
+const Fixacao = lazy(() => import("./pages/Analise/Fixacao"));
+const CadastroADM = lazy(() => import("./pages/CadastroADM"))
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,8 @@ const App = () => (
               <Route path="/painel" element={<Painel />} />
               <Route path="/MunicipioEResponsaveis" element={<DadosMunicipioEResponsaveis />} />
               <Route path="/TratamentoLeis" element={<TratamentoLeis />} />
+              <Route path="/Fixacao" element={<Fixacao />} />
+              <Route path="/CadastroADM" element={<CadastroADM />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense> {/* Close Suspense */}

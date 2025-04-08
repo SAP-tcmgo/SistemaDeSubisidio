@@ -7,14 +7,17 @@ import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea'; // Import Textarea
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select
 import { Button } from "@/components/ui/button"; // Import Button
-import { Plus, Trash2, Edit } from 'lucide-react'; // Keep Plus, Trash2, add Edit
-import { MdHome as Home, MdOutlineArrowCircleRight as CircleArrowRight, MdOutlineArrowCircleLeft as CircleArrowLeft, MdSave as Save} from 'react-icons/md';
-import { BsEraserFill } from "react-icons/bs";
+import { Plus, Trash2, Edit, Eye, MinusCircle as RemoveIcon } from 'lucide-react'; // Keep Plus, Trash2, add Edit, Eye, CheckCircle, XCircle
 import { useNavigate } from 'react-router-dom';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog"; // Import Dialog components including Footer and Close
+// Import Dialog components including Footer, Close, and Description
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+// Import Accordion components
+import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea
+import BreadcrumbNav from '../../components/BreadcrumbNav'; // Import the new component
+import Icons from '../../components/Icons'; // Import the new Icons component
 import '../../styles/AppAnalise.css';
 import '../../styles/indexAnalise.css';
-import { useDados } from '../../Contexts/DadosContext'; // Remove LeiIncluida import if not used elsewhere
+import { useDados } from '../../Contexts/DadosContext';
 import { toast } from '../../components/ui/use-toast';
 import axios from 'axios';
 import { db } from '../../firebase'; // Import Firestore instance
@@ -44,8 +47,8 @@ const TratamentoLeis: React.FC = () => {
     setNumeroHabitantes,
     doQueSeTrata,
     setDoQueSeTrata,
-    // leis, // We will manage inflationary laws locally now, fetched from Firestore
-    // setLeis,
+    leis, // Use this from context to store included law IDs
+    setLeis, // Setter for included law IDs
     leisColare, // Keep this as requested, but won't be used here
     setLeisColare, // Keep this as requested
     numeroProcesso
@@ -61,6 +64,11 @@ const TratamentoLeis: React.FC = () => {
   const [leiAtual, setLeiAtual] = useState<Partial<LeiPoliticaInflacionaria>>({}); // For create/edit form
   const [isEditing, setIsEditing] = useState<boolean>(false); // To differentiate between add and edit mode
 
+  // State for the view all laws dialog (shows ALL registered laws)
+  const [isViewAllDialogOpen, setIsViewAllDialogOpen] = useState<boolean>(false);
+  // State for the new dialog showing ONLY included laws
+  const [isViewIncludedDialogOpen, setIsViewIncludedDialogOpen] = useState<boolean>(false);
+
   // Fetch population (existing useEffect - keep as is)
   useEffect(() => {
     const ApiPopulacao = async () => {
@@ -72,12 +80,15 @@ const TratamentoLeis: React.FC = () => {
           const populationData = response.data[1]; 
           const population = populationData?.V || '0';
           setNumeroHabitantes(parseInt(population, 10));
-        } catch (error) {
+        } catch (error: any) {
           console.error('Erro ao buscar população:', error);
+          if (axios.isAxiosError(error) && error.response) {
+            console.error('Erro ao buscar população (detalhes):', error.response.data);
+          }
           setNumeroHabitantes(0); // Reset or handle error appropriately
         }
       } else {
-         setNumeroHabitantes(0); // Reset if no municipio is selected
+        setNumeroHabitantes(0); // Reset if no municipio is selected
       }
     };
 
@@ -160,10 +171,10 @@ const TratamentoLeis: React.FC = () => {
     };
 
     try {
-      const leisCollectionRef = collection(db, "LeisPolicitaInflacionarias");
+      const leisCollectionRef = collection(db, "LeisPoliticaInflacionarias");
       if (isEditing && leiAtual.id) {
         // Update existing document
-        const leiDocRef = doc(db, "LeisPolicitaInflacionarias", leiAtual.id);
+        const leiDocRef = doc(db, "LeisPoliticaInflacionarias", leiAtual.id);
         await updateDoc(leiDocRef, dadosLei);
         toast({ title: "Sucesso", description: "Lei atualizada com sucesso!" });
       } else {
@@ -189,15 +200,38 @@ const TratamentoLeis: React.FC = () => {
        return;
      }
      try {
-       const leiDocRef = doc(db, "LeisPolicitaInflacionarias", id);
+       const leiDocRef = doc(db, "LeisPoliticaInflacionarias", id);
        await deleteDoc(leiDocRef);
        toast({ title: "Sucesso", description: "Lei excluída com sucesso!" });
-       fetchLeisInflacionarias(); // Refresh the list
+       fetchLeisInflacionarias();
      } catch (error) {
        console.error("Erro ao excluir lei:", error);
        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
        toast({ title: "Erro", description: `Falha ao excluir lei: ${errorMessage}`, variant: "destructive" });
-     }
+    }
+  };
+
+  // --- Handler to toggle inclusion of a law in the process ---
+  const handleToggleIncluirLei = (leiId: string) => {
+    if (!leiId) return; // Safety check
+
+    setLeis(prevLeis => {
+      if (prevLeis.includes(leiId)) {
+        // Remove the ID if it's already included
+        return prevLeis.filter(id => id !== leiId);
+      } else {
+        // Add the ID if it's not included
+        return [...prevLeis, leiId];
+      }
+    });
+  };
+
+
+   // --- Handler to Edit from View All Dialog ---
+   const handleEditFromViewAll = (lei: LeiPoliticaInflacionaria, e: React.MouseEvent) => {
+     e.stopPropagation(); // Prevent accordion toggle
+     handleAbrirDialogEditarLei(lei); // Open the edit dialog
+     setIsViewAllDialogOpen(false); // Close the view all dialog
    };
 
   // --- Rest of the component logic (keep toggleSidebar, handleTratamentoCheckboxChange, etc.) ---
@@ -244,6 +278,19 @@ const TratamentoLeis: React.FC = () => {
     });
   };
 
+  // --- Icon Click Handlers ---
+  const handleErase = () => {
+    handleClearScreen();
+  };
+
+  const handleBack = () => {
+    navigate('/MunicipioEResponsaveis');
+  };
+
+  const handleNext = () => {
+    navigate('/Fixacao');
+  };
+
 
   return (
     <div className="municipios-theme flex min-h-screen flex-col bg-gray-50">
@@ -255,58 +302,60 @@ const TratamentoLeis: React.FC = () => {
           <Header toggleSidebar={toggleSidebar} />
           </div>
 
+          {/* Use the new BreadcrumbNav component */}
+          <BreadcrumbNav currentPage="Tratamento Leis" sidebarOpen={sidebarOpen} />
+
           <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
             <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden ">
               <div className="p-6 ">
-
+                <div className="mt-[-20px] flex justify-end">
+                      <Icons
+                        onEraseClick={handleErase}
+                        onBackClick={handleBack}
+                        onNextClick={handleNext}
+                        // onSaveClick is omitted as it does nothing yet
+                      />
+                </div>
                 <div className="relative mb-8 text-primary text-center">
-                  <h1 className="text-2xl font-bold">Trata-se de {numeroProcesso && `(${numeroProcesso})`}</h1>
-                  <div className="absolute top-0 right-0 h-full flex items-center space-x-4">
-                    <Home onClick={() => navigate('/telaInicial')} className='cursor-pointer text-tribunal-blue' size={24}/>
-                    <BsEraserFill onClick={handleClearScreen} className='cursor-pointer text-tribunal-blue' size={22} title="Limpar Tela"/> {/* Added Eraser Icon */}
-                    <Save className='cursor-pointer text-tribunal-blue' size={24}/>
-                    <CircleArrowLeft onClick={() => navigate('/MunicipioEResponsaveis')} className='cursor-pointer text-tribunal-blue' size={26}/>
-                    {/* ArrowRight might navigate to the next step if there is one */}
-                    {/* <CircleArrowRight onClick={() => navigate('/ProximaEtapa')} className='cursor-pointer text-tribunal-blue' size={26}/> */}
-                  </div>
+                  <h1 className="text-2xl font-bold mt-[-20px]">Trata-se de {numeroProcesso && `(${numeroProcesso})`}</h1>
                 </div>
               
                 <div className="text-gray-700 flex flex-wrap gap-6 mb-8">
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="fixacao"
+                      id="fixacaoCheckbox"
                       checked={doQueSeTrata.includes("fixacao")}
                       onCheckedChange={() => handleTratamentoCheckboxChange("fixacao")}
                     />
-                    <Label htmlFor="fixacao" className="text-sm">Fixação</Label>
+                    <Label htmlFor="fixacaoCheckbox" className="text-sm">Fixação</Label>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="revisaoGeral"
+                      id="revisaoGeralCheckbox"
                       checked={doQueSeTrata.includes("revisaoGeral")}
                       onCheckedChange={() => handleTratamentoCheckboxChange("revisaoGeral")}
                     />
-                    <Label htmlFor="revisaoGeral" className="text-sm">Revisão Geral Anual</Label>
+                    <Label htmlFor="revisaoGeralCheckbox" className="text-sm">Revisão Geral Anual</Label>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="decimoTerceiro"
+                      id="decimoTerceiroCheckbox"
                       checked={doQueSeTrata.includes("decimoTerceiro")}
                       onCheckedChange={() => handleTratamentoCheckboxChange("decimoTerceiro")}
                     />
-                    <Label htmlFor="decimoTerceiro" className="text-sm">Décimo Terceiro</Label>
+                    <Label htmlFor="decimoTerceiroCheckbox" className="text-sm">Décimo Terceiro</Label>
                   </div>
 
                   <div className="flex items-center space-x-2">
                     <Checkbox
-                      id="ferias"
+                      id="feriasCheckbox"
                       checked={doQueSeTrata.includes("ferias")}
                       onCheckedChange={() => handleTratamentoCheckboxChange("ferias")}
                     />
-                    <Label htmlFor="ferias" className="text-sm">Férias</Label>
+                    <Label htmlFor="feriasCheckbox" className="text-sm">Férias</Label>
                   </div>
 
                 </div>
@@ -325,46 +374,204 @@ const TratamentoLeis: React.FC = () => {
                 <div className="text-gray-700 mb-8">
                   <div className="flex justify-between items-center mb-2">
                     <h2 className="font-medium text-sm">Leis acerca da política inflacionária do município {municipio?.nome || '...'}:</h2>
-                    <Button onClick={handleAbrirDialogNovaLei} size="sm" className="bg-secondary hover:bg-secondary/90 text-white">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Cadastrar Lei
-                    </Button>
-                  </div>
-                  <div className="border border-gray-300 rounded-md text-sm min-h-[100px]">
-                    {isLoadingLeisInflacionarias ? (
-                      <div className="p-4 text-gray-500 italic">Carregando leis...</div>
-                    ) : fetchErrorLeisInflacionarias ? (
-                      <div className="p-4 text-red-600 italic">{fetchErrorLeisInflacionarias}</div>
-                    ) : leisInflacionarias.length > 0 ? (
-                      leisInflacionarias.map((lei, index) => (
-                        <div key={lei.id || index} className={`p-4 flex justify-between items-center ${index !== 0 ? 'border-t border-gray-300' : ''}`}>
-                          <span className="flex-1 pr-4">
-                            {lei.numeroLeiAno} - {lei.teorArtigo.substring(0, 50)}{lei.teorArtigo.length > 50 ? '...' : ''}
-                          </span>
-                          <div className="flex space-x-2">
-                             <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleAbrirDialogEditarLei(lei)}>
-                               <Edit className="h-4 w-4" />
-                             </Button>
-                             <Button variant="destructive" size="icon" className="h-7 w-7" onClick={() => lei.id && handleDeletarLei(lei.id)}>
-                               <Trash2 className="h-4 w-4" />
-                             </Button>
+                    <div className="flex space-x-2"> {/* Wrap buttons in a flex container */}
+                      {/* Button to view ONLY INCLUDED laws */}
+                      <Dialog open={isViewIncludedDialogOpen} onOpenChange={setIsViewIncludedDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-primary/10">
+                            <Eye className="h-4 w-4 mt-[3px]" />
+                            Visualizar Leis Incluídas ({leis.length}) {/* Show count */}
+                          </Button>
+                        </DialogTrigger>
+                        {/* Dialog Content for INCLUDED Laws */}
+                        <DialogContent className="sm:max-w-[700px] bg-white max-h-[80vh] flex flex-col">
+                           <DialogHeader>
+                             <DialogTitle className="text-lg font-semibold text-gray-800 text-center font-bold">
+                               Leis Incluídas no Processo
+                             </DialogTitle>
+                             <DialogDescription className="text-center">
+                               Leis selecionadas para este processo.
+                             </DialogDescription>
+                           </DialogHeader>
+                           <div className="py-4 overflow-y-auto flex-grow border border-gray-300 rounded-md p-4"> {/* Added box styling */}
+                             {isLoadingLeisInflacionarias ? (
+                               <p className="text-center text-gray-500">Carregando...</p>
+                             ) : leis.length > 0 ? (
+                               <ScrollArea className="h-[400px] w-full">
+                                 {leisInflacionarias
+                                   .filter(lei => lei.id && leis.includes(lei.id))
+                                   .map((leiIncluida) => (
+                                     <div key={leiIncluida.id} className="border border-gray-300 p-2 rounded mb-2 flex justify-between items-center text-sm">
+                                       <div>
+                                         <p className="font-medium">{leiIncluida.numeroLeiAno}</p>
+                                         <p className="text-gray-600 truncate">{leiIncluida.teorArtigo.substring(0, 80)}{leiIncluida.teorArtigo.length > 80 ? '...' : ''}</p>
+                                       </div>
+                                       <Button
+                                         variant="ghost"
+                                         size="sm"
+                                         onClick={() => leiIncluida.id && handleToggleIncluirLei(leiIncluida.id)}
+                                         className="text-red-500 hover:text-red-700"
+                                         title="Remover do Processo"
+                                       >
+                                         <RemoveIcon className="h-4 w-4" />
+                                       </Button>
+                                     </div>
+                                   ))}
+                               </ScrollArea>
+                             ) : (
+                               <p className="text-center text-gray-500">Nenhuma lei incluída neste processo ainda.</p>
+                             )}
+                           </div>
+                           <DialogFooter className="mt-auto pt-4 border-t border-gray-200">
+                             <DialogClose asChild>
+                               <Button type="button" variant="outline">Fechar</Button>
+                             </DialogClose>
+                           </DialogFooter>
+                         </DialogContent>
+                      </Dialog>
+
+                      {/* Dialog Trigger/Button for Cadastrar Lei (remains the same) */}
+                      <Button onClick={handleAbrirDialogNovaLei} size="sm" className="bg-secondary hover:bg-secondary/90 text-white">
+                        <Plus className="h-4 w-4 mt-[3px]" />
+                        Cadastrar Lei
+                      </Button>
+
+                      {/* Hidden Dialog for Viewing ALL Registered Laws (triggered from Cadastrar Lei dialog) */}
+                      <Dialog open={isViewAllDialogOpen} onOpenChange={setIsViewAllDialogOpen}>
+                        {/* No visible trigger here, opened programmatically */}
+                        <DialogContent className="sm:max-w-[900px] bg-white max-h-[80vh] flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle className="text-lg font-semibold text-gray-800 text-center font-bold">
+                              Todas Leis Cadastradas - {municipio?.nome || 'Município'}
+                            </DialogTitle>
+                            <DialogDescription className="text-center">
+                              Lista de todas as leis cadastradas para este município.
+                            </DialogDescription>
+                          </DialogHeader>
+                          {/* Added Box Styling Wrapper */}
+                          <div className="py-4 overflow-y-auto flex-grow border border-gray-300 rounded-md p-4">
+                            {isLoadingLeisInflacionarias ? (
+                              <p className="text-center text-gray-500">Carregando leis...</p>
+                            ) : fetchErrorLeisInflacionarias ? (
+                              <p className="text-center text-red-500">{fetchErrorLeisInflacionarias}</p>
+                            ) : leisInflacionarias.length > 0 ? (
+                              <ScrollArea className="h-[450px] w-full"> {/* Use ScrollArea instead of Accordion */}
+                                 {leisInflacionarias.map((lei) => {
+                                  const isIncluded = lei.id ? leis.includes(lei.id) : false;
+                                  return (
+                                    <div key={lei.id || lei.numeroLeiAno} className={`border border-gray-300 rounded-md p-3 mb-2 flex justify-between items-center text-sm ${isIncluded ? 'bg-green-100' : ''}`}>
+                                      <div className="flex-1 mr-4 overflow-hidden">
+                                        <p className="font-medium truncate">{lei.numeroLeiAno}</p>
+                                        <p className="text-gray-600 truncate">{lei.teorArtigo}</p>
+                                      </div>
+                                      <div className="flex space-x-2 items-center">
+                                        <Button
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-7 w-7"
+                                          onClick={(e) => handleEditFromViewAll(lei, e)}
+                                          title="Editar Lei"
+                                        >
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 w-7 text-red-500 hover:text-red-700"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (lei.id) handleDeletarLei(lei.id);
+                                          }}
+                                          title="Excluir Lei"
+                                          disabled={!lei.id}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={`h-7 w-7 ${isIncluded ? 'text-red-500 hover:text-red-700' : 'text-primary hover:text-primary/80'}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (lei.id) handleToggleIncluirLei(lei.id);
+                                          }}
+                                          title={isIncluded ? "Remover do Processo" : "Incluir no Processo"}
+                                          disabled={!lei.id}
+                                        >
+                                          {isIncluded ? <RemoveIcon className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </ScrollArea>
+                            ) : (
+                              <p className="text-center text-gray-500">Nenhuma lei inflacionária cadastrada para este município.</p>
+                            )}
                           </div>
-                        </div>
-                      ))
+                          <DialogFooter className="mt-auto pt-4 border-t border-gray-200">
+                            <DialogClose asChild>
+                              <Button type="button" variant="outline">Fechar</Button>
+                            </DialogClose>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                  {/* Main List Displaying Laws - Now with Add/Remove */}
+                  <div className="border border-gray-300 rounded-md text-sm min-h-[100px] p-4"> {/* Added padding */}
+                    {isLoadingLeisInflacionarias ? (
+                      <div className="text-gray-500 italic">Carregando leis...</div>
+                    ) : fetchErrorLeisInflacionarias ? (
+                      <div className="text-red-600 italic">{fetchErrorLeisInflacionarias}</div>
+                    ) : leisInflacionarias.length > 0 ? (
+                      <ScrollArea className="h-[200px] w-full"> {/* Added ScrollArea */}
+                        {leisInflacionarias.map((lei) => {
+                          const isIncluded = lei.id ? leis.includes(lei.id) : false;
+                          return (
+                            // Box styling for each item
+                            <div key={lei.id || lei.numeroLeiAno} className={`border border-gray-300 rounded-md p-3 mb-2 flex justify-between items-center ${isIncluded ? 'bg-green-100' : ''}`}>
+                              <span className="flex-1 pr-4 overflow-hidden">
+                                <p className="font-medium truncate">{lei.numeroLeiAno}</p>
+                                <p className="text-gray-600 truncate">{lei.teorArtigo.substring(0, 80)}{lei.teorArtigo.length > 80 ? '...' : ''}</p>
+                              </span>
+                              <div className="flex space-x-2">
+                                <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => handleAbrirDialogEditarLei(lei)} title="Editar Lei">
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => lei.id && handleDeletarLei(lei.id)} title="Excluir Lei">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                {/* Add/Remove Button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`h-7 w-7 ${isIncluded ? 'text-red-500 hover:text-red-700' : 'text-primary hover:text-primary/80'}`}
+                                  onClick={() => lei.id && handleToggleIncluirLei(lei.id)}
+                                  title={isIncluded ? "Remover do Processo" : "Incluir no Processo"}
+                                  disabled={!lei.id}
+                                >
+                                  {isIncluded ? <RemoveIcon className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </ScrollArea>
                     ) : (
-                      <div className="p-4 text-gray-500 italic">Nenhuma lei inflacionária cadastrada para este município.</div>
+                      <div className="text-gray-500 italic">Nenhuma lei inflacionária cadastrada para este município.</div>
                     )}
                   </div>
                 </div>
 
                 <Dialog open={isLeiDialogOpen} onOpenChange={setIsLeiDialogOpen}>
-                  <DialogContent className="sm:max-w-[800px] bg-white">
+                  <DialogContent className="sm:max-w-[800px] bg-white dialog-content-min-height">
                     <DialogHeader>
-                      <DialogTitle className="text-lg font-semibold text-gray-800 text-center font-bold mb-[-10px]">
-                        {isEditing ? 'Editar Lei da Política Inflacionária' : 'Cadastrar Nova Lei da Política Inflacionária'}
+                      <DialogTitle className="text-lg font-semibold text-gray-800 text-center font-bold mb-[-15px]">
+                        {isEditing ? 'Editar Lei da Política Inflacionária' : 'Cadastrar Nova Lei'}
                       </DialogTitle>
                     </DialogHeader>
-                    <div className="py-4 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto" style={{ maxHeight: '450px' }}>
+                    <div className="py-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <Label htmlFor="municipioNome">Município</Label>
                         <Input id="municipioNome" value={municipio?.nome || 'N/A'} disabled className="mt-1 bg-gray-100" />
@@ -379,20 +586,19 @@ const TratamentoLeis: React.FC = () => {
                       </div>
                       <div className="md:col-span-3">
                         <Label htmlFor="teorArtigo">Teor do artigo <span className="text-red-500">*</span></Label>
-                        <Textarea id="teorArtigo" name="teorArtigo" value={leiAtual.teorArtigo || ''} onChange={handleInputChange} className="mt-1" placeholder="Texto livre..." />
+                        <Textarea id="teorArtigo" name="teorArtigo" value={leiAtual.teorArtigo || ''} onChange={handleInputChange} className="mt-1"/>
                       </div>
                       <div>
                         <Label htmlFor="indice">Índice</Label>
                         <Input id="indice" name="indice" value={leiAtual.indice || ''} onChange={handleInputChange} className="mt-1" placeholder="Ex: INPC" />
                       </div>
                       <div>
-                        <Label htmlFor="mesDataBase">Mês da Data Base Municipal</Label>
+                        <Label htmlFor="mesDataBaseTrigger">Mês da Data Base Municipal</Label>
                         <Select name="mesDataBase" value={leiAtual.mesDataBase || ''} onValueChange={(value) => handleSelectChange('mesDataBase', value)}>
-                          <SelectTrigger className="mt-1">
+                          <SelectTrigger id="mesDataBaseTrigger" className="mt-1">
                             <SelectValue placeholder="Selecione o mês" />
                           </SelectTrigger>
                           <SelectContent className="bg-white">
-                            <SelectItem value=" ">-</SelectItem>
                             <SelectItem value="janeiro">Janeiro</SelectItem>
                             <SelectItem value="fevereiro">Fevereiro</SelectItem>
                             <SelectItem value="marco">Março</SelectItem>
@@ -413,11 +619,17 @@ const TratamentoLeis: React.FC = () => {
                         <Input id="entradaEmVigor" name="entradaEmVigor" type="date" value={leiAtual.entradaEmVigor || ''} onChange={handleInputChange} className="mt-1" placeholder="DD/MM/AAAA" />
                       </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter style={{ backgroundColor: 'white', borderTop: '1px solid #ccc', padding: '10px' }}>
+                     <div className="flex justify-start w-full"> 
+                        <Button type="button" variant="outline" onClick={() => setIsViewAllDialogOpen(true)} className="text-primary border-primary hover:bg-primary/10">
+                            <Eye className="h-4 w-4 mr-1" />
+                            Visualizar Todas Cadastradas
+                        </Button>
+                      </div>
                       <DialogClose asChild>
                         <Button type="button" variant="outline">Cancelar</Button>
                       </DialogClose>
-                      <Button type="button" onClick={handleSalvarLeiInflacionaria} className="bg-primary hover:bg-primary/90 text-white">
+                      <Button type="button" onClick={handleSalvarLeiInflacionaria} className="bg-primary hover:bg-primary/90 text-white ml-2" style={{ backgroundColor: '#004B8D', color: 'white' }}>
                         {isEditing ? 'Salvar Alterações' : 'Cadastrar Lei'}
                       </Button>
                     </DialogFooter>
@@ -432,5 +644,6 @@ const TratamentoLeis: React.FC = () => {
     </div>
   );
 };
+
 
 export default TratamentoLeis;

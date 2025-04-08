@@ -19,7 +19,7 @@ const TelaInicial = () => {
     setProcessoInput(event.target.value);
   };
 
-  const handleNavigation = async () => {
+  const handleNavigationMunicipio = async () => {
     if (processoInput) {
       setNumeroProcesso(processoInput); // Set the process number in context
       await loadAnaliseData(processoInput); // Load data from Firebase
@@ -29,6 +29,11 @@ const TelaInicial = () => {
       console.warn("Número do processo não inserido.");
       // You might want to show a message to the user here
     }
+  };
+
+  const handleNavigationCadADM = async () => {
+    navigate(`/CadastroADM`); // Navigate
+
   };
 
   const toggleSidebar = () => {
@@ -81,17 +86,20 @@ const TelaInicial = () => {
                       {/* Use the shared handler for both buttons */}
                       <button
                         className="tribunal-button w-full justify-center"
-                        onClick={handleNavigation}
+                        onClick={handleNavigationMunicipio}
                       >
                         Iniciar ou Editar
                       </button>
                       <button
                         className="tribunal-button-secondary w-full justify-center"
-                        onClick={handleNavigation}
+                        onClick={handleNavigationMunicipio}
                       >
                         Consultar
                       </button>
-                      <button className="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-6 rounded-md w-full transition-all duration-300 hover:bg-gray-50">
+                      <button 
+                        className="bg-white border border-gray-200 text-gray-700 font-medium py-2 px-6 rounded-md w-full transition-all duration-300 hover:bg-gray-50"
+                        onClick={handleNavigationCadADM}
+                      >
                         Administrador
                       </button>
                     </div>
