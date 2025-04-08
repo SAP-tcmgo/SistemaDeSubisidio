@@ -1,1 +1,0 @@
-import{r as e,j as o}from"./vendor-others-2QI88d8I.js";var u=e.createContext(void 0),s=({client:r,children:t})=>(e.useEffect(()=>(r.mount(),()=>{r.unmount()}),[r]),o.jsx(u.Provider,{value:r,children:t}));export{s as Q};

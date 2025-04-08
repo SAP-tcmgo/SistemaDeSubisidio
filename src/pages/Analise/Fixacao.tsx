@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Calendar } from 'lucide-react';
-import Header from '../../components/Header'; // Added Header
-import Sidebar from '../../components/Sidebar'; // Added Sidebar
+import React, { useState, useEffect, useMemo } from 'react'; // Added useEffect, useMemo
+import { Calendar, Info } from 'lucide-react'; // Added Info icon for messages
+import Header from '../../components/Header';
+import Sidebar from '../../components/Sidebar';
 import BreadcrumbNav from '../../components/BreadcrumbNav'; // Added BreadcrumbNav
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,17 +11,64 @@ import { useNavigate } from 'react-router-dom'; // Added useNavigate
 import Icons from '../../components/Icons';
 import { useDados } from '../../Contexts/DadosContext'; // Added useDados
 import '../../styles/AppAnalise.css'; // Added styles
-import '../../styles/indexAnalise.css'; // Added styles
+import '../../styles/indexAnalise.css';
 import VerificationIcon from '../../components/VerificationIcon';
+import { db } from '../../firebase'; // Import db
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip for messages
+
+// Interfaces for Firebase data
+interface SubsidioFirebase {
+  AnoLegislatura: string;
+  Valor: number;
+  fixadoPelaLei: string;
+  dataEntradaVigorLei: string;
+}
+
+interface PercentualFirebase {
+  AnoLegislatura: string;
+  NrHabitantes: string;
+  PercentualUtilizado: string;
+  RangeStart: number;
+  RangeEnd: number | null;
+  PercentageValue: number;
+}
+
+// Interface for validation results
+interface ValidationResult {
+  isValid: boolean;
+  message: string | null;
+}
+
+// Define structure for subsidy data within the component
+interface SubsidioItem {
+  cargo: string;
+  valorKey: string; // Key in formData for the value input
+  validationKey: string; // Key for the validation result state
+}
 
 
+const Fixacao: React.FC = () => {
+  const navigate = useNavigate();
+  const { numeroProcesso, numeroHabitantes } = useDados(); // Get numeroHabitantes
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-const Fixacao: React.FC = () => { // Renamed component
-  const navigate = useNavigate(); // Added navigate hook
-  const { numeroProcesso } = useDados(); // Get numeroProcesso from context
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Added sidebar state
+  // State for fetched Firebase data
+  const [subsidioDeputadoEstadual, setSubsidioDeputadoEstadual] = useState<SubsidioFirebase | null>(null);
+  const [subsidioMinistroSTF, setSubsidioMinistroSTF] = useState<SubsidioFirebase | null>(null);
+  const [percentuaisSalarioDep, setPercentuaisSalarioDep] = useState<PercentualFirebase[]>([]);
 
-interface FormData {
+  // State for validation results
+  const [validationResults, setValidationResults] = useState<{ [key: string]: ValidationResult }>({
+    prefeito: { isValid: true, message: null },
+    vicePrefeito: { isValid: true, message: null },
+    secretarios: { isValid: true, message: null },
+    vereadores: { isValid: true, message: null },
+    presidenteCamara: { isValid: true, message: null },
+  });
+
+
+  interface FormData {
   atoNormativo: string;
   legislatura: string;
   dataFixacao: string;
@@ -40,11 +87,34 @@ const [formData, setFormData] = useState<FormData>({
     numeroLei: '',
     numeroAcordao: '',
     ressalvaLivre: false,
+    // Add keys for subsidy values if not already present implicitly
+    'valor-0': '', // Prefeito
+    'valor-1': '', // Vice-Prefeito
+    'valor-2': '', // Secretários
+    'valor-3': '', // Vereadores
+    'valor-4': '', // Presidente da Câmara
   });
 
   const [selectedVicio, setSelectedVicio] = useState<number | null>(0);
 
-  const toggleSidebar = () => { // Added toggleSidebar function
+  // Define the subsidies structure for the table
+  const subsidiosConfig: SubsidioItem[] = [
+    { cargo: "Prefeito", valorKey: "valor-0", validationKey: "prefeito" },
+    { cargo: "Vice-Prefeito", valorKey: "valor-1", validationKey: "vicePrefeito" },
+    { cargo: "Secretários", valorKey: "valor-2", validationKey: "secretarios" },
+    { cargo: "Vereadores", valorKey: "valor-3", validationKey: "vereadores" },
+    { cargo: "Presidente da Câmara", valorKey: "valor-4", validationKey: "presidenteCamara" },
+  ];
+
+  // Helper function to parse currency (ensure it exists)
+  const parseCurrency = (value: string): number => {
+      if (!value) return 0;
+      const numericString = value.replace(/[^\d,]/g, '').replace(',', '.'); // Allow only digits and comma
+      return parseFloat(numericString) || 0;
+  };
+
+
+  const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
@@ -62,16 +132,157 @@ const [formData, setFormData] = useState<FormData>({
        ressalvaLivre: false,
      });
      setSelectedVicio(0); // Reset to default or null
-     // Add toast notification if desired
+      // Add toast notification if desired
   };
 
-  const subsidios = [
-    { cargo: "Prefeito", valor: "R$ 33.233,00", isValid: true },
-    { cargo: "Vice-Prefeito", valor: "R$ 16.566,00", isValid: true },
-    { cargo: "Secretários", valor: "R$ 12.000,00", isValid: true },
-    { cargo: "Vereadores", valor: "R$ 9.000,00", isValid: false },
-    { cargo: "Presidente da Câmara", valor: "R$ 9.000,00", isValid: false },
-  ];
+  // Fetch Firebase data based on legislatura
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!formData.legislatura) {
+        // Reset fetched data if legislatura is cleared
+        setSubsidioDeputadoEstadual(null);
+        setSubsidioMinistroSTF(null);
+        setPercentuaisSalarioDep([]);
+        return;
+      }
+
+      try {
+        // Fetch Deputados Estaduais
+        const depQuery = query(
+          collection(db, "SubsidiosDeputadosEstaduais"),
+          where("AnoLegislatura", "==", formData.legislatura),
+          limit(1) // Assuming only one entry per legislatura
+        );
+        const depSnapshot = await getDocs(depQuery);
+        if (!depSnapshot.empty) {
+          setSubsidioDeputadoEstadual(depSnapshot.docs[0].data() as SubsidioFirebase);
+        } else {
+          setSubsidioDeputadoEstadual(null); // Not found
+        }
+
+        // Fetch Ministros STF
+        const stfQuery = query(
+          collection(db, "SubsidiosMinistrosSTF"),
+          where("AnoLegislatura", "==", formData.legislatura),
+          limit(1) // Assuming only one entry per legislatura
+        );
+        const stfSnapshot = await getDocs(stfQuery);
+        if (!stfSnapshot.empty) {
+          setSubsidioMinistroSTF(stfSnapshot.docs[0].data() as SubsidioFirebase);
+        } else {
+          setSubsidioMinistroSTF(null); // Not found
+        }
+
+        // Fetch Percentuais Salario Dep (consider filtering by legislatura if applicable)
+        // If AnoLegislatura in PercentualSalarioDep should match formData.legislatura, add a where clause
+        const percQuery = query(collection(db, "PercentualSalarioDep"));
+        // const percQuery = query(collection(db, "PercentualSalarioDep"), where("AnoLegislatura", "==", formData.legislatura));
+        const percSnapshot = await getDocs(percQuery);
+        const percentuais = percSnapshot.docs.map(doc => doc.data() as PercentualFirebase);
+        setPercentuaisSalarioDep(percentuais);
+
+      } catch (error) {
+        console.error("Erro ao buscar dados do Firebase:", error);
+        // Handle error appropriately (e.g., show toast)
+        setSubsidioDeputadoEstadual(null);
+        setSubsidioMinistroSTF(null);
+        setPercentuaisSalarioDep([]);
+      }
+    };
+
+    fetchData();
+  }, [formData.legislatura]); // Re-fetch when legislatura changes
+
+
+  // --- Validation Logic ---
+  const validationCalculations = useMemo(() => {
+    const results: { [key: string]: ValidationResult } = {
+      prefeito: { isValid: true, message: null },
+      vicePrefeito: { isValid: true, message: null },
+      secretarios: { isValid: true, message: null },
+      vereadores: { isValid: true, message: null },
+      presidenteCamara: { isValid: true, message: null },
+    };
+
+    const prefeitoValor = parseCurrency(formData['valor-0']);
+    const vicePrefeitoValor = parseCurrency(formData['valor-1']);
+    const secretariosValor = parseCurrency(formData['valor-2']);
+    const vereadoresValor = parseCurrency(formData['valor-3']);
+    const presidenteCamaraValor = parseCurrency(formData['valor-4']);
+
+    // --- Prefeito Validation (Rule 2) ---
+    if (prefeitoValor > 0 && subsidioMinistroSTF) {
+      if (prefeitoValor >= subsidioMinistroSTF.Valor) {
+        results.prefeito = { isValid: false, message: `Subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}) deve ser menor que o do Ministro STF (R$ ${subsidioMinistroSTF.Valor.toFixed(2)}).` };
+      }
+    } else if (prefeitoValor > 0 && !subsidioMinistroSTF) {
+       results.prefeito = { isValid: false, message: `Dados do subsídio STF para a legislatura ${formData.legislatura} não encontrados.` };
+    }
+
+    // --- Vice-Prefeito Validation (Rule 3) ---
+    if (vicePrefeitoValor > 0 && prefeitoValor > 0) {
+      if (vicePrefeitoValor >= prefeitoValor) {
+        results.vicePrefeito = { isValid: false, message: `Subsídio do Vice-Prefeito (R$ ${vicePrefeitoValor.toFixed(2)}) deve ser menor que o do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+      }
+    }
+
+    // --- Secretários Validation (Rule 4) ---
+    if (secretariosValor > 0 && prefeitoValor > 0) {
+      if (secretariosValor >= prefeitoValor) {
+        results.secretarios = { isValid: false, message: `Subsídio dos Secretários (R$ ${secretariosValor.toFixed(2)}) deve ser menor que o do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+      }
+    }
+
+    // --- Vereadores/Presidente Validation (Rule 1) ---
+    if (subsidioDeputadoEstadual && percentuaisSalarioDep.length > 0 && prefeitoValor > 0) {
+      // Find the correct percentage based on numeroHabitantes
+      const applicablePercentual = percentuaisSalarioDep
+        .sort((a, b) => a.RangeStart - b.RangeStart) // Ensure sorted ranges
+        .find(p => numeroHabitantes >= p.RangeStart && (p.RangeEnd === null || numeroHabitantes <= p.RangeEnd));
+
+      if (applicablePercentual) {
+        const percentualDecimal = applicablePercentual.PercentageValue / 100;
+        const tetoVereador = subsidioDeputadoEstadual.Valor * percentualDecimal;
+
+        // Vereador Check
+        if (vereadoresValor > 0) {
+          if (vereadoresValor >= tetoVereador) {
+             results.vereadores = { isValid: false, message: `Subsídio (R$ ${vereadoresValor.toFixed(2)}) excede o teto de ${applicablePercentual.PercentageValue}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
+          } else if (tetoVereador >= prefeitoValor) {
+             results.vereadores = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+          }
+        }
+
+        // Presidente Câmara Check (same logic, different input value)
+        if (presidenteCamaraValor > 0) {
+           if (presidenteCamaraValor >= tetoVereador) {
+             results.presidenteCamara = { isValid: false, message: `Subsídio (R$ ${presidenteCamaraValor.toFixed(2)}) excede o teto de ${applicablePercentual.PercentageValue}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
+           } else if (tetoVereador >= prefeitoValor) {
+             results.presidenteCamara = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+           }
+        }
+
+      } else {
+        const message = `Faixa percentual para ${numeroHabitantes} habitantes não encontrada.`;
+        if (vereadoresValor > 0) results.vereadores = { isValid: false, message };
+        if (presidenteCamaraValor > 0) results.presidenteCamara = { isValid: false, message };
+      }
+    } else if ((vereadoresValor > 0 || presidenteCamaraValor > 0) && (!subsidioDeputadoEstadual || percentuaisSalarioDep.length === 0)) {
+        const message = `Dados de Dep. Estadual ou Percentuais para a legislatura ${formData.legislatura} não encontrados.`;
+        if (vereadoresValor > 0) results.vereadores = { isValid: false, message };
+        if (presidenteCamaraValor > 0) results.presidenteCamara = { isValid: false, message };
+    }
+
+    return results;
+  }, [formData, subsidioDeputadoEstadual, subsidioMinistroSTF, percentuaisSalarioDep, numeroHabitantes]);
+
+  // Update validationResults state when calculations change
+  useEffect(() => {
+    setValidationResults(validationCalculations);
+  }, [validationCalculations]);
+
+
+  // Removed static subsidios array
 
   const vicios = [
     "1 - Ausência de Documentação Essencial",
@@ -177,26 +388,48 @@ const [formData, setFormData] = useState<FormData>({
                     </tr>
                   </thead>
                   <tbody>
-                    {subsidios.map((subsidio, index) => (
-                      <tr key={index}>
-                        <td className="border p-2 text-left">{subsidio.cargo}</td>
-                        <td className="border-b p-2 flex text-center justify-center">
-                          <Input
-                            type="text"
-                            name={`valor-${index}`} // Give each input a unique name
-                            value={formData[`valor-${index}`] || ''} // Access value using unique name
-                            onChange={(e) =>
-                              setFormData({ ...formData, [`valor-${index}`]: e.target.value })
-                            }
-                            className="w-32"
-                            placeholder="R$ 0,00"
-                          />
-                        </td>
-                        <td className="border p-2 w-22 ">
-                          <div className='flex justify-center'><VerificationIcon isValid={subsidio.isValid} /></div>
-                        </td>
-                      </tr>
-                    ))}
+                    {subsidiosConfig.map((subsidio) => {
+                      const validation = validationResults[subsidio.validationKey] || { isValid: true, message: null };
+                      const hasValue = !!formData[subsidio.valorKey]; // Check if input has a value
+
+                      return (
+                        <tr key={subsidio.validationKey}>
+                          <td className="border p-2 text-left">{subsidio.cargo}</td>
+                          <td className="border-b p-2 flex text-center justify-center">
+                            <Input
+                              type="text"
+                              name={subsidio.valorKey}
+                              value={formData[subsidio.valorKey] || ''}
+                              onChange={(e) =>
+                                setFormData({ ...formData, [subsidio.valorKey]: e.target.value })
+                              }
+                              className="w-32"
+                              placeholder="R$ 0,00"
+                            />
+                          </td>
+                          <td className="border p-2 w-22">
+                            {/* Only show icon if there's a value */}
+                            {hasValue && (
+                              <div className='flex justify-center items-center gap-1'>
+                                <VerificationIcon isValid={validation.isValid} />
+                                {!validation.isValid && validation.message && (
+                                  <TooltipProvider delayDuration={100}>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Info size={16} className="text-red-600 cursor-help" />
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-black text-white">
+                                        <p>{validation.message}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

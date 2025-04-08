@@ -142,17 +142,21 @@ const CadastroADM = () => {
   };
 
   return (
-    <div className="dashboard-theme min-h-screen bg-gray-50 flex flex-col">
-        <Header toggleSidebar={toggleSidebar} />
+    // Removed flex flex-col from the outermost div as it's handled internally now
+    <div className="dashboard-theme min-h-screen bg-gray-50"> 
+        {/* Sidebar remains fixed */}
+        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} /> 
 
-        <div className="flex flex-1">
-        <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+        {/* This div now wraps Header and main, and handles the margin shift */}
+        <div className={`flex flex-col flex-1 transition-all duration-300 ease-in-out ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+          {/* Header moved inside the shifting container */}
+          <Header toggleSidebar={toggleSidebar} /> 
 
-        {/* Apply conditional margin and transition to the main content */}
-        <main className={`flex-1 p-6 transition-all duration-300 ease-in-out ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
-          <div className="flex items-center mb-6 cursor-pointer" onClick={() => navigate('/telaInicial')}>
-            <ArrowLeft className="mr-2 text-tribunal-blue" size={24} />
-            <h1 className="text-3xl font-bold text-tribunal-blue">Cadastro de Administrador</h1>
+          {/* Main content no longer needs individual margin adjustment */}
+          <main className="flex-1 p-6"> 
+            <div className="flex items-center mb-6 cursor-pointer" onClick={() => navigate('/telaInicial')}>
+              <ArrowLeft className="mr-2 text-tribunal-blue" size={24} />
+              <h1 className="text-3xl font-bold text-tribunal-blue">Cadastro de Administrador</h1>
           </div>
           
           <form onSubmit={handleSubmit} className="w-full max-w-6xl mx-auto space-y-6">

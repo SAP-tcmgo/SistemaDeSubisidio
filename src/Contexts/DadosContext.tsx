@@ -89,7 +89,9 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
     }
 
     console.log(`Tentando carregar dados para o processo: ${numeroProc}`);
-    const docRef = doc(db, 'analise', numeroProc); // Referência ao documento na coleção 'analise'
+    // Replace '/' with '_' for Firebase compatibility
+    const safeNumeroProc = numeroProc.replace(/\//g, '_'); 
+    const docRef = doc(db, 'analise', safeNumeroProc); // Use the safe version for the document reference
     try {
       const docSnap = await getDoc(docRef);
 
