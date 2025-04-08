@@ -36,7 +36,7 @@ const GlowIcon: React.FC<GlowIconProps> = ({
           className
         )}
       >
-        <Icon size={size} className="mr-[-15px] transition-transform duration-300 ease-in-out" />
+        <Icon size={size} className="cursor-pointer mr-[-15px] transition-transform duration-300 ease-in-out" />
       </div>
       {label && (
         <span className="mt-[-15px] mr-[-15px] text-xs font-medium text-muted-foreground">{label}</span>

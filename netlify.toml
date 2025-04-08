@@ -6,6 +6,16 @@
   directory = "functions"
 
 [[redirects]]
+  from = "/api/passaporte/*"
+  to = "http://ws.tcm.go.gov.br/api/rest/passaporteService/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/api/colare/*"
+  to = "http://ws.tcm.go.gov.br/api/rest/colareService/:splat"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
