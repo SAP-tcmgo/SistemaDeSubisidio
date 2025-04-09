@@ -784,7 +784,7 @@ const MunicipioEResponsaveis: React.FC = () => {
                          <div className="pt-4 flex items-center text-sm">
                           <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-primary/10">
                             <Eye className="h-4 w-4 mr-1" />
-                            Visualizar Resposáveis Incluídos
+                            Visualizar Responsáveis Incluídos
                           </Button>
                          </div>
                        </DialogTrigger>
