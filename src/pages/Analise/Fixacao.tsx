@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch'; // Added Switch
 import { useNavigate } from 'react-router-dom'; // Added useNavigate
 import Icons from '../../components/Icons';
 import { useDados } from '../../Contexts/DadosContext'; // Added useDados
@@ -76,26 +77,35 @@ const Fixacao: React.FC = () => {
   numeroLei: string;
   numeroAcordao: string;
   ressalvaLivre: boolean;
-  [key: string]: any; // Allow dynamic keys for subsidy values and vicios
+  viciosChecks: { [key: string]: boolean }; // State for vicio checkboxes
+  viciosDetails: { // State for vicio inputs and switches
+    [key: string]: {
+      inputValue?: string;
+      ressalvaAV?: boolean;
+    }
+  };
+  [key: string]: any; // Add index signature to allow dynamic keys like valor-0, vicio-1 etc.
 }
 
 const [formData, setFormData] = useState<FormData>({
     atoNormativo: '',
     legislatura: '',
     dataFixacao: '',
-    anotacaoPlanilha: true,
+    anotacaoPlanilha: false,
     numeroLei: '',
     numeroAcordao: '',
     ressalvaLivre: false,
-    // Add keys for subsidy values if not already present implicitly
-    'valor-0': '', // Prefeito
+    viciosChecks: {}, // Initialize vicios state
+    viciosDetails: {}, // Initialize vicios state
+    // Explicitly define subsidy value keys if needed, or handle dynamically
+    'valor-0': '', // Prefeito - Assuming handled by subsidiosConfig logic
     'valor-1': '', // Vice-Prefeito
     'valor-2': '', // Secretários
     'valor-3': '', // Vereadores
     'valor-4': '', // Presidente da Câmara
   });
 
-  const [selectedVicio, setSelectedVicio] = useState<number | null>(0);
+  // const [selectedVicio, setSelectedVicio] = useState<number | null>(0); // Removed if not used
 
   // Define the subsidies structure for the table
   const subsidiosConfig: SubsidioItem[] = [
@@ -158,8 +168,17 @@ const [formData, setFormData] = useState<FormData>({
        numeroLei: '',
        numeroAcordao: '',
        ressalvaLivre: false,
+       // Also reset vicios state
+       viciosChecks: {},
+       viciosDetails: {},
+       // Reset subsidy values explicitly if they are part of the initial state structure
+       'valor-0': '',
+       'valor-1': '',
+       'valor-2': '',
+       'valor-3': '',
+       'valor-4': '',
      });
-     setSelectedVicio(0); // Reset to default or null
+     // setSelectedVicio(0); // Removed as setSelectedVicio is not defined
       // Add toast notification if desired
   };
 
@@ -360,7 +379,58 @@ const [formData, setFormData] = useState<FormData>({
     setFormData(prev => ({ ...prev, [name]: checked }));
   };
 
-  
+  // --- Vicios Handlers ---
+  const handleVicioCheckboxChange = (index: number, checked: boolean) => {
+    const vicioKey = `vicio-${index}`;
+    setFormData(prev => {
+      const newChecks = { ...prev.viciosChecks, [vicioKey]: checked };
+      const newDetails = { ...prev.viciosDetails };
+      if (checked) {
+        // Initialize details if checking, preserve existing if re-checking
+        if (!newDetails[vicioKey]) {
+          newDetails[vicioKey] = { ressalvaAV: false, inputValue: '' };
+        }
+      } else {
+        // Optionally clear details when unchecking, or keep them
+        // delete newDetails[vicioKey]; // Uncomment to clear details on uncheck
+      }
+      return {
+        ...prev,
+        viciosChecks: newChecks,
+        viciosDetails: newDetails,
+      };
+    });
+  };
+
+  const handleVicioInputChange = (index: number, value: string) => {
+    const vicioKey = `vicio-${index}`;
+    setFormData(prev => ({
+      ...prev,
+      viciosDetails: {
+        ...prev.viciosDetails,
+        [vicioKey]: {
+          ...(prev.viciosDetails[vicioKey] || { ressalvaAV: false }), // Ensure object exists
+          inputValue: value,
+        },
+      },
+    }));
+  };
+
+  const handleVicioSwitchChange = (index: number, checked: boolean) => {
+    const vicioKey = `vicio-${index}`;
+    setFormData(prev => ({
+      ...prev,
+      viciosDetails: {
+        ...prev.viciosDetails,
+        [vicioKey]: {
+          ...(prev.viciosDetails[vicioKey] || { inputValue: '' }), // Ensure object exists
+          ressalvaAV: checked,
+        },
+      },
+    }));
+  };
+
+
   // --- Icon Click Handlers ---
   const handleErase = () => {
     handleClearScreen(); // Reuse the existing clear logic
@@ -511,10 +581,12 @@ const [formData, setFormData] = useState<FormData>({
                 <label htmlFor="anotacao" className="text-blue-800 font-medium">Anotação na planilha de controle de gastos</label>
               </div>
 
-              <div className="mb-8 p-4 border rounded-md bg-gray-50 text-sm">
-                <p className="mb-2">Trata-se de procedimento de anotação, para fins de controle de gastos, da Lei nº 
-                  <Input 
-                    name="numeroLei" 
+              {/* Conditional rendering for the annotation text block */}
+              {formData.anotacaoPlanilha && (
+                <div className="mb-8 p-4 border rounded-md bg-gray-50 text-sm">
+                  <p className="mb-2">Trata-se de procedimento de anotação, para fins de controle de gastos, da Lei nº
+                    <Input
+                      name="numeroLei"
                     value={formData.numeroLei} 
                     onChange={handleInputChange} 
                     className="inline-block w-24 mx-1" 
@@ -530,25 +602,82 @@ const [formData, setFormData] = useState<FormData>({
                   />.
                 </p>
               </div>
+              )} {/* Correctly close the conditional block here */}
 
               <div className="mb-8">
                 <h2 className="text-lg font-bold mb-4">Vícios ou Ressalvas da Fixação de Subsídios:</h2>
 
-                <div className="space-y-2">
-                  {vicios.map((vicio, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`vicio-${index}`}
-                        checked={formData[`vicio-${index}`] || false} // Use unique name for state
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, [`vicio-${index}`]: !!checked })
-                        }
-                      />
-                      <Label htmlFor={`vicio-${index}`} className="text-base font-normal">{vicio}</Label>
-                    </div>
-                  ))}
+                <div className="space-y-4"> {/* Increased spacing */}
+                  {vicios.map((vicio, index) => {
+                    const vicioKey = `vicio-${index}`;
+                    const isChecked = formData.viciosChecks[vicioKey] || false;
+                    const details = formData.viciosDetails[vicioKey] || { inputValue: '', ressalvaAV: false };
+
+                    // Determine if an input is needed for this index
+                    const needsInput = [0, 3, 5, 6, 7, 9].includes(index);
+                    // Define placeholder based on index
+                    let inputPlaceholder = '';
+                    switch (index) {
+                      case 0: inputPlaceholder = "Descreva a documentação ausente"; break;
+                      case 3: inputPlaceholder = "Número da Lei"; break;
+                      case 5: inputPlaceholder = "Qual(is) cargo(s) excedeu(eram) ao teto"; break;
+                      case 6: inputPlaceholder = "Data da eleição"; break;
+                      case 7: inputPlaceholder = "Art. e Lei alterados"; break;
+                      case 9: inputPlaceholder = "Descreva a divergência"; break;
+                      default: inputPlaceholder = "Detalhes"; // Default placeholder
+                    }
+
+
+                    return (
+                      <div key={index} className="p-3 border rounded-md bg-gray-50"> {/* Added padding and border */}
+                        <div className="flex items-center space-x-2 mb-2"> {/* Margin bottom for spacing */}
+                          <Checkbox
+                            id={vicioKey}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => handleVicioCheckboxChange(index, !!checked)}
+                          />
+                          <Label htmlFor={vicioKey} className="text-base font-normal">{vicio}</Label>
+                        </div>
+
+                        {/* Conditional rendering for input and switch */}
+                        {isChecked && (
+                          <div className="pl-6 mt-2 space-y-2"> {/* Indent and space out conditional elements */}
+                            {needsInput && (
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor={`${vicioKey}-input`} className="text-sm whitespace-nowrap">{inputPlaceholder}:</Label>
+                                <Input
+                                  id={`${vicioKey}-input`}
+                                  value={details.inputValue || ''}
+                                  onChange={(e) => handleVicioInputChange(index, e.target.value)}
+                                  placeholder={inputPlaceholder}
+                                  className="flex-grow"
+                                  type={index === 6 ? "date" : "text"} // Set type to "date" specifically for index 6
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                               {/* Label for the "Ressalva" state (when switch is off) */}
+                               <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${!(details.ressalvaAV || false) ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
+                                 Ressalva
+                               </Label>
+                               <Switch
+                                id={`${vicioKey}-switch`}
+                                checked={details.ressalvaAV || false} // true = A/V, false = Ressalva
+                                onCheckedChange={(checked) => handleVicioSwitchChange(index, checked)}
+                              />
+                              {/* Label for the "A/V" state (when switch is on) */}
+                              <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${(details.ressalvaAV || false) ? 'font-semibold text-green-600' : 'text-gray-500'}`}>
+                                A/V
+                              </Label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
 
               <div className="mb-8 flex items-center gap-2">
                 <Checkbox 
@@ -570,12 +699,12 @@ const [formData, setFormData] = useState<FormData>({
                 <h2 className="text-lg font-semibold mb-4">Conferência do Texto de Fixação de Subsídios</h2>
                 <div className="border rounded-md w-full h-64"></div>
               </div>
-            </div>
-            </div>
+              </div> {/* Add missing closing tag for the p-6 div */}
+            </div> {/* Closing tag for max-w-5xl div */}
           </main>
-        </div>
-      </div>
-    </div>
+        </div> {/* Closing tag for ml-0/ml-64 div */}
+      </div> {/* Closing tag for min-h-screen bg-gray-50 div */}
+    </div> // Closing tag for municipios-theme div
   );
 };
 

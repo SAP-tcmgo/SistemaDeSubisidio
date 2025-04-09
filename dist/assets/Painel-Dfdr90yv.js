@@ -1,1 +1,0 @@
-import{j as e}from"./vendor-others-Di0KkQDI.js";import"./vendor-firebase-DUe4cX6Q.js";const a=()=>e.jsx("div",{className:"dashboard-theme",children:e.jsx("h1",{children:"Painel"})});export{a as default};
