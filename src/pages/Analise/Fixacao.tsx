@@ -29,9 +29,9 @@ interface PercentualFirebase {
   AnoLegislatura: string;
   NrHabitantes: string;
   PercentualUtilizado: string;
-  RangeStart: number;
-  RangeEnd: number | null;
-  PercentageValue: number;
+  minimo: number; // Corresponds to minimo
+  maximo: number | null; // Corresponds to RangeEnd (Firestore might store 0 or null for open end)
+  porcentagemValor: number; // Corresponds to PercentageValue
 }
 
 // Interface for validation results
@@ -106,11 +106,39 @@ const [formData, setFormData] = useState<FormData>({
     { cargo: "Presidente da Câmara", valorKey: "valor-4", validationKey: "presidenteCamara" },
   ];
 
-  // Helper function to parse currency (ensure it exists)
+  // Refined helper function to parse currency, handling various pt-BR formats
   const parseCurrency = (value: string): number => {
       if (!value) return 0;
-      const numericString = value.replace(/[^\d,]/g, '').replace(',', '.'); // Allow only digits and comma
-      return parseFloat(numericString) || 0;
+      // 1. Remove currency symbols and whitespace
+      let cleanedValue = value.replace(/R\$|\s/g, '');
+
+      // 2. Standardize to use '.' as decimal separator
+      // Check if comma exists (likely pt-BR decimal separator)
+      if (cleanedValue.includes(',')) {
+          // Remove thousand separators (dots)
+          cleanedValue = cleanedValue.replace(/\./g, '');
+          // Replace comma decimal separator with dot
+          cleanedValue = cleanedValue.replace(',', '.');
+      } else {
+          // No comma found. Dot might be a decimal or thousand separator.
+          const dotCount = (cleanedValue.match(/\./g) || []).length;
+
+          if (dotCount === 1 && cleanedValue.endsWith('.')) {
+               // Handle case like "3500." -> treat as 3500
+               cleanedValue = cleanedValue.slice(0, -1);
+          } else if (dotCount === 1 && cleanedValue.indexOf('.') === cleanedValue.length - 3) {
+              // Single dot, two digits after it (e.g., "3500.00") -> Treat as decimal
+              // No change needed for parseFloat.
+          } else if (dotCount >= 1) {
+               // Multiple dots, or single dot not followed by 2 digits -> Assume dots are thousand separators
+               cleanedValue = cleanedValue.replace(/\./g, '');
+          }
+          // If no dots or commas (e.g., "3500"), cleanedValue remains "3500"
+      }
+
+      // 3. Parse the standardized string
+      const numericValue = parseFloat(cleanedValue);
+      return isNaN(numericValue) ? 0 : numericValue;
   };
 
 
@@ -147,10 +175,12 @@ const [formData, setFormData] = useState<FormData>({
       }
 
       try {
+        const legislaturaValue = formData.legislatura.trim();
+
         // Fetch Deputados Estaduais
         const depQuery = query(
           collection(db, "SubsidiosDeputadosEstaduais"),
-          where("AnoLegislatura", "==", formData.legislatura),
+          where("AnoLegislatura", "==", legislaturaValue),
           limit(1) // Assuming only one entry per legislatura
         );
         const depSnapshot = await getDocs(depQuery);
@@ -163,7 +193,7 @@ const [formData, setFormData] = useState<FormData>({
         // Fetch Ministros STF
         const stfQuery = query(
           collection(db, "SubsidiosMinistrosSTF"),
-          where("AnoLegislatura", "==", formData.legislatura),
+          where("AnoLegislatura", "==", legislaturaValue),
           limit(1) // Assuming only one entry per legislatura
         );
         const stfSnapshot = await getDocs(stfQuery);
@@ -175,8 +205,10 @@ const [formData, setFormData] = useState<FormData>({
 
         // Fetch Percentuais Salario Dep (consider filtering by legislatura if applicable)
         // If AnoLegislatura in PercentualSalarioDep should match formData.legislatura, add a where clause
-        const percQuery = query(collection(db, "PercentualSalarioDep"));
-        // const percQuery = query(collection(db, "PercentualSalarioDep"), where("AnoLegislatura", "==", formData.legislatura));
+        const percQuery = query(
+          collection(db, "PercentualSalarioDep"),
+          where("AnoLegislatura", "==", legislaturaValue)
+        );
         const percSnapshot = await getDocs(percQuery);
         const percentuais = percSnapshot.docs.map(doc => doc.data() as PercentualFirebase);
         setPercentuaisSalarioDep(percentuais);
@@ -204,74 +236,90 @@ const [formData, setFormData] = useState<FormData>({
       presidenteCamara: { isValid: true, message: null },
     };
 
-    const prefeitoValor = parseCurrency(formData['valor-0']);
-    const vicePrefeitoValor = parseCurrency(formData['valor-1']);
-    const secretariosValor = parseCurrency(formData['valor-2']);
-    const vereadoresValor = parseCurrency(formData['valor-3']);
-    const presidenteCamaraValor = parseCurrency(formData['valor-4']);
+    const prefeitoValor = parseCurrency(formData['valor-0'] || "0");
+    const vicePrefeitoValor = parseCurrency(formData['valor-1'] || "0");
+    const secretariosValor = parseCurrency(formData['valor-2'] || "0");
+    const vereadoresValor = parseCurrency(formData['valor-3'] || "0");
+    const presidenteCamaraValor = parseCurrency(formData['valor-4'] || "0");
+
+    // --- Vereadores/Presidente Validation (Rule 1) ---
+    // Check if deputy subsidy and percentages are available. Mayor's value check removed from here.
+    if (subsidioDeputadoEstadual && percentuaisSalarioDep.length > 0) {
+      // Find the correct percentage based on numeroHabitantes, handling potentially swapped min/max
+      const applicablePercentual = percentuaisSalarioDep
+        // Sort by the *smaller* of the two boundary values to handle potential swaps
+        .sort((a, b) => Math.min(a.minimo, a.maximo ?? Infinity) - Math.min(b.minimo, b.maximo ?? Infinity))
+        .find(p => {
+            // Determine the actual lower and upper bounds, ignoring which field they are in
+            const lowerBound = Math.min(p.minimo, p.maximo ?? Infinity);
+            // Use Infinity for null/0 maximo to represent an open upper bound
+            const upperBound = p.maximo === null || p.maximo === 0 ? Infinity : Math.max(p.minimo, p.maximo);
+            // Check if numeroHabitantes falls within the actual bounds
+            return numeroHabitantes >= lowerBound && numeroHabitantes <= upperBound;
+        });
+
+      if (applicablePercentual) {
+        const percentualDecimal = applicablePercentual.porcentagemValor / 100;
+        const tetoVereador = subsidioDeputadoEstadual.Valor * percentualDecimal;
+
+        // Vereador Check
+          // Vereador Check - Perform checks if vereadoresValor has a value (even if 0, compare against teto)
+          // The check against prefeitoValor is now independent of whether prefeitoValor is > 0
+          if (formData['valor-3'] !== '') { // Check if input is not empty, allowing 0
+            if (Number(vereadoresValor) >= tetoVereador) {
+               results.vereadores = { isValid: false, message: `Subsídio (R$ ${vereadoresValor.toFixed(2)}) excede o teto de ${applicablePercentual.porcentagemValor}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
+            } else if (tetoVereador >= Number(prefeitoValor)) { // This check now runs even if prefeitoValor is 0
+               results.vereadores = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+            }
+          }
+
+          // Presidente Câmara Check - Perform checks if presidenteCamaraValor has a value
+          // The check against prefeitoValor is now independent of whether prefeitoValor is > 0
+          if (formData['valor-4'] !== '') { // Check if input is not empty, allowing 0
+             if (Number(presidenteCamaraValor) >= tetoVereador) {
+               results.presidenteCamara = { isValid: false, message: `Subsídio (R$ ${presidenteCamaraValor.toFixed(2)}) excede o teto de ${applicablePercentual.porcentagemValor}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
+             } else if (tetoVereador >= Number(prefeitoValor)) { // This check now runs even if prefeitoValor is 0
+               results.presidenteCamara = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
+             }
+          }
+
+      } else {
+        const message = `Faixa percentual para ${numeroHabitantes} habitantes não encontrada.`;
+        if (Number(vereadoresValor) > 0) results.vereadores = { isValid: false, message };
+        if (Number(presidenteCamaraValor) > 0) results.presidenteCamara = { isValid: false, message };
+      }
+    } else if ((Number(vereadoresValor) > 0 || Number(presidenteCamaraValor) > 0) && (!subsidioDeputadoEstadual || percentuaisSalarioDep.length === 0)) {
+        const message = `Dados de Dep. Estadual ou Percentuais para a legislatura ${formData.legislatura} não encontrados.`;
+        if (Number(vereadoresValor) > 0) results.vereadores = { isValid: false, message };
+        if (Number(presidenteCamaraValor) > 0) results.presidenteCamara = { isValid: false, message };
+    }
+
 
     // --- Prefeito Validation (Rule 2) ---
-    if (prefeitoValor > 0 && subsidioMinistroSTF) {
-      if (prefeitoValor >= subsidioMinistroSTF.Valor) {
+    if (Number(prefeitoValor) > 0 && subsidioMinistroSTF) {
+      if (Number(prefeitoValor) >= subsidioMinistroSTF.Valor) {
         results.prefeito = { isValid: false, message: `Subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}) deve ser menor que o do Ministro STF (R$ ${subsidioMinistroSTF.Valor.toFixed(2)}).` };
       }
-    } else if (prefeitoValor > 0 && !subsidioMinistroSTF) {
+    } else if (Number(prefeitoValor) > 0 && !subsidioMinistroSTF) {
        results.prefeito = { isValid: false, message: `Dados do subsídio STF para a legislatura ${formData.legislatura} não encontrados.` };
     }
 
     // --- Vice-Prefeito Validation (Rule 3) ---
-    if (vicePrefeitoValor > 0 && prefeitoValor > 0) {
-      if (vicePrefeitoValor >= prefeitoValor) {
+    // Check if vicePrefeitoValor has a value. Compare against prefeitoValor even if prefeitoValor is 0.
+    if (formData['valor-1'] !== '') { // Check if input is not empty, allowing 0
+      if (Number(vicePrefeitoValor) >= Number(prefeitoValor)) {
         results.vicePrefeito = { isValid: false, message: `Subsídio do Vice-Prefeito (R$ ${vicePrefeitoValor.toFixed(2)}) deve ser menor que o do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
       }
     }
 
     // --- Secretários Validation (Rule 4) ---
-    if (secretariosValor > 0 && prefeitoValor > 0) {
-      if (secretariosValor >= prefeitoValor) {
+    // Check if secretariosValor has a value. Compare against prefeitoValor even if prefeitoValor is 0.
+    if (formData['valor-2'] !== '') { // Check if input is not empty, allowing 0
+      if (Number(secretariosValor) >= Number(prefeitoValor)) {
         results.secretarios = { isValid: false, message: `Subsídio dos Secretários (R$ ${secretariosValor.toFixed(2)}) deve ser menor que o do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
       }
     }
 
-    // --- Vereadores/Presidente Validation (Rule 1) ---
-    if (subsidioDeputadoEstadual && percentuaisSalarioDep.length > 0 && prefeitoValor > 0) {
-      // Find the correct percentage based on numeroHabitantes
-      const applicablePercentual = percentuaisSalarioDep
-        .sort((a, b) => a.RangeStart - b.RangeStart) // Ensure sorted ranges
-        .find(p => numeroHabitantes >= p.RangeStart && (p.RangeEnd === null || numeroHabitantes <= p.RangeEnd));
-
-      if (applicablePercentual) {
-        const percentualDecimal = applicablePercentual.PercentageValue / 100;
-        const tetoVereador = subsidioDeputadoEstadual.Valor * percentualDecimal;
-
-        // Vereador Check
-        if (vereadoresValor > 0) {
-          if (vereadoresValor >= tetoVereador) {
-             results.vereadores = { isValid: false, message: `Subsídio (R$ ${vereadoresValor.toFixed(2)}) excede o teto de ${applicablePercentual.PercentageValue}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
-          } else if (tetoVereador >= prefeitoValor) {
-             results.vereadores = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
-          }
-        }
-
-        // Presidente Câmara Check (same logic, different input value)
-        if (presidenteCamaraValor > 0) {
-           if (presidenteCamaraValor >= tetoVereador) {
-             results.presidenteCamara = { isValid: false, message: `Subsídio (R$ ${presidenteCamaraValor.toFixed(2)}) excede o teto de ${applicablePercentual.PercentageValue}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
-           } else if (tetoVereador >= prefeitoValor) {
-             results.presidenteCamara = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
-           }
-        }
-
-      } else {
-        const message = `Faixa percentual para ${numeroHabitantes} habitantes não encontrada.`;
-        if (vereadoresValor > 0) results.vereadores = { isValid: false, message };
-        if (presidenteCamaraValor > 0) results.presidenteCamara = { isValid: false, message };
-      }
-    } else if ((vereadoresValor > 0 || presidenteCamaraValor > 0) && (!subsidioDeputadoEstadual || percentuaisSalarioDep.length === 0)) {
-        const message = `Dados de Dep. Estadual ou Percentuais para a legislatura ${formData.legislatura} não encontrados.`;
-        if (vereadoresValor > 0) results.vereadores = { isValid: false, message };
-        if (presidenteCamaraValor > 0) results.presidenteCamara = { isValid: false, message };
-    }
 
     return results;
   }, [formData, subsidioDeputadoEstadual, subsidioMinistroSTF, percentuaisSalarioDep, numeroHabitantes]);
@@ -289,7 +337,7 @@ const [formData, setFormData] = useState<FormData>({
     "2 -A fixação dos subsídios do Prefeito, do Vice-Prefeito, dos Secretários e dos Vereadores, NÃO deu-se mediante lei de iniciativa da Câmara.",
     "3 - NÃO houve declaração do Prefeito no ato de sanção",
     "4 - A fixação do subsídio dos vereadores ocorreu por meio de outra norma.",
-    "5 -A Lei que fixou os subsídios dos vereadores NÃO deu-se mediante iniciativa da Câmara.",
+    "5 -A Lei que fixou os subsídios dos vereadores ocorreu por meio de outra norma.",
     "6 -Subsídio fixado excede ao teto regulamentar.",
     "7 - Houve Desobediência ao Princípio da Anterioridade.",
     "8 -houve alteração de norma para retirar a exigência da anterioridade",
@@ -300,7 +348,12 @@ const [formData, setFormData] = useState<FormData>({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name.startsWith('valor-')) {
+      const numericValue = value.replace(/[^\d,]/g, ''); // Allow only digits and comma
+      setFormData(prev => ({ ...prev, [name]: numericValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
@@ -372,7 +425,7 @@ const [formData, setFormData] = useState<FormData>({
                       value={formData.legislatura}
                       onChange={handleInputChange}
                       className="w-[100px] md:max-w-xs"
-                      placeholder="2020-2024"
+                      placeholder="2020/2024"
                     />
                   </div>
                 </div>
@@ -396,13 +449,14 @@ const [formData, setFormData] = useState<FormData>({
                         <tr key={subsidio.validationKey}>
                           <td className="border p-2 text-left">{subsidio.cargo}</td>
                           <td className="border-b p-2 flex text-center justify-center">
-                            <Input
+<Input
                               type="text"
                               name={subsidio.valorKey}
                               value={formData[subsidio.valorKey] || ''}
-                              onChange={(e) =>
-                                setFormData({ ...formData, [subsidio.valorKey]: e.target.value })
-                              }
+                              onChange={(e) => {
+                                const rawValue = e.target.value;
+                                setFormData({ ...formData, [subsidio.valorKey]: rawValue });
+                              }}
                               className="w-32"
                               placeholder="R$ 0,00"
                             />

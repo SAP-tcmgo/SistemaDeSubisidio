@@ -5,68 +5,68 @@ import { X } from "lucide-react";
 
 interface PercentageRangeItemProps {
   index: number;
-  rangeStart: string;
-  rangeEnd: string;
-  percentage: string;
-  onRangeStartChange: (value: string) => void;
-  onRangeEndChange: (value: string) => void;
-  onPercentageChange: (value: string) => void;
+  maximo: string;
+  minimo: string;
+  porcentagem: string;
+  onMaximoChange: (value: string) => void;
+  onMinimoChange: (value: string) => void;
+  onPorcentagemChange: (value: string) => void;
   onRemove: () => void;
   isRemovable: boolean;
 }
 
 const PercentageRangeItem: React.FC<PercentageRangeItemProps> = ({
   index,
-  rangeStart,
-  rangeEnd,
-  percentage,
-  onRangeStartChange,
-  onRangeEndChange,
-  onPercentageChange,
+  maximo,
+  minimo,
+  porcentagem,
+  onMaximoChange,
+  onMinimoChange,
+  onPorcentagemChange,
   onRemove,
   isRemovable
 }) => {
   return (
     <div className="flex flex-col md:flex-row gap-4 items-start md:items-center p-4 border border-gray-200 rounded-md bg-white">
       <div className="flex-1">
-        <label htmlFor={`rangeStart-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={`maximo-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
           De
         </label>
         <Input
-          id={`rangeStart-${index}`}
+          id={`maximo-${index}`}
           type="number"
           min="0"
-          value={rangeStart}
-          onChange={(e) => onRangeStartChange(e.target.value)}
+          value={maximo}
+          onChange={(e) => onMaximoChange(e.target.value)}
           placeholder="Mínimo"
           className="w-full"
         />
       </div>
       <div className="flex-1">
-        <label htmlFor={`rangeEnd-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={`minimo-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
           a
         </label>
         <Input
-          id={`rangeEnd-${index}`}
+          id={`minimo-${index}`}
           type="number"
           min="0"
-          value={rangeEnd}
-          onChange={(e) => onRangeEndChange(e.target.value)}
+          value={minimo}
+          onChange={(e) => onMinimoChange(e.target.value)}
           placeholder="Máximo"
           className="w-full"
         />
       </div>
       <div className="flex-1">
-        <label htmlFor={`percentage-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor={`porcentagem-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
           Percentual (%)
         </label>
         <Input
-          id={`percentage-${index}`}
+          id={`porcentagem-${index}`}
           type="number"
           min="0"
           max="100"
-          value={percentage}
-          onChange={(e) => onPercentageChange(e.target.value)}
+          value={porcentagem}
+          onChange={(e) => onPorcentagemChange(e.target.value)}
           placeholder="Percentual"
           className="w-full"
         />

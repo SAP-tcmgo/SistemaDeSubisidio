@@ -7,10 +7,11 @@ import {
   sendPasswordResetEmail 
 } from "firebase/auth";
 import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  serverTimestamp 
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -37,6 +38,7 @@ export {
   signInWithEmailAndPassword, 
   sendPasswordResetEmail, 
   collection, 
-  addDoc, 
-  serverTimestamp 
+  addDoc,
+  serverTimestamp,
+  getDocs
 };

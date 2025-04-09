@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import { Input } from "@/components/ui/input";
@@ -9,19 +9,20 @@ import PercentageRangeItem from "../components/PercentageRangeItem";
 import { toast } from "sonner";
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { db, collection, addDoc } from "../firebase"; // Import Firebase functions
+import { db, collection, addDoc, getDocs } from "../firebase"; // Import Firebase functions
+import { updateDoc, doc, query, where, deleteDoc } from "firebase/firestore";
 import '../styles/AppConfiguracoesDashboard.css';
 import '../styles/indexConfiguracoesDashboard.css';
 
 interface PercentageRange {
   id: string;
-  rangeStart: string;
-  rangeEnd: string;
-  percentage: string;
+  maximo: string;
+  minimo: string;
+  porcentagem: string;
 }
 
 const CadastroADM = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Added sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   const [deputadosLegislatura, setDeputadosLegislatura] = useState("");
@@ -35,20 +36,88 @@ const CadastroADM = () => {
   const [ministrosDataLei, setMinistrosDataLei] = useState("");
 
   const [percentageRanges, setPercentageRanges] = useState<PercentageRange[]>([
-    { id: "1", rangeStart: "", rangeEnd: "10000", percentage: "20" },
+    { id: "1", maximo: "", minimo: "10000", porcentagem: "20" },
   ]);
 
-  const handleAddRange = () => {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch SubsidiosDeputadosEstaduais
+        const deputadosSnapshot = await getDocs(collection(db, "SubsidiosDeputadosEstaduais"));
+        deputadosSnapshot.forEach((doc) => {
+          const data = doc.data();
+          setDeputadosLegislatura(data.AnoLegislatura || "");
+          setDeputadosValor(data.Valor ? data.Valor.toString() : "");
+          setDeputadosLei(data.fixadoPelaLei || "");
+          setDeputadosDataLei(data.dataEntradaVigorLei || "");
+        });
+
+        // Fetch SubsidiosMinistrosSTF
+        const ministrosSnapshot = await getDocs(collection(db, "SubsidiosMinistrosSTF"));
+        ministrosSnapshot.forEach((doc) => {
+          const data = doc.data();
+          setMinistrosLegislatura(data.AnoLegislatura || "");
+          setMinistrosValor(data.Valor ? data.Valor.toString() : "");
+          setMinistrosLei(data.fixadoPelaLei || "");
+          setMinistrosDataLei(data.dataEntradaVigorLei || "");
+        });
+
+        // Fetch PercentualSalarioDep
+        const percentageRangesSnapshot = await getDocs(collection(db, "PercentualSalarioDep"));
+        const ranges: PercentageRange[] = [];
+        percentageRangesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          const nrHabitantes = data.NrHabitantes;
+          const rangeParts = nrHabitantes.split(" - ");
+
+          let maximo = "";
+          let minimo = "";
+
+          if (rangeParts.length === 2) {
+              maximo = rangeParts[0].replace(/\./g, '');
+              minimo = rangeParts[1].replace(/\./g, '');
+          } else if (nrHabitantes.startsWith("Acima de ")) {
+              maximo = nrHabitantes.replace("Acima de ", "").replace(/\./g, '');
+              minimo = "";
+          }
+
+          const porcentagem = data.PercentualUtilizado ? data.PercentualUtilizado.replace("%", "") : "";
+
+          ranges.push({
+              id: doc.id,
+              maximo: maximo,
+              minimo: minimo,
+              porcentagem: porcentagem,
+          });
+        });
+        // Merge fetched ranges with initial state
+        setPercentageRanges(prevRanges => {
+          // If there are existing ranges in Firebase, use them. Otherwise, keep the initial range.
+          return ranges.length > 0 ? ranges : prevRanges;
+        });
+
+      } catch (error) {
+        console.error("Error fetching data from Firebase:", error);
+        toast("Erro ao carregar dados!",{
+          description: "Ocorreu um erro ao tentar carregar as informações do Firebase. Verifique o console para mais detalhes.",
+        });
+      }
+    };
+
+    fetchData();
+  }, []);
+
+ const handleAddRange = () => {
     const lastRange = percentageRanges[percentageRanges.length - 1];
-    const newRangeStart = lastRange.rangeEnd;
-    
-    setPercentageRanges([
-      ...percentageRanges,
+    const newMaximo = lastRange ? lastRange.minimo : "";
+
+    setPercentageRanges(prevRanges => [
+      ...prevRanges,
       {
         id: Date.now().toString(),
-        rangeStart: newRangeStart,
-        rangeEnd: "",
-        percentage: "",
+        maximo: newMaximo,
+        minimo: "",
+        porcentagem: "",
       },
     ]);
   };
@@ -65,24 +134,50 @@ const CadastroADM = () => {
     );
   };
 
-  // Helper function to convert currency string to number
+  // Refined helper function to parse currency, handling various pt-BR formats
   const parseCurrency = (value: string): number => {
-    if (!value) return 0;
-    // Remove dots, replace comma with dot, then parse
-    const numericString = value.replace(/\./g, '').replace(',', '.');
-    return parseFloat(numericString) || 0; // Return 0 if parsing fails
+      if (!value) return 0;
+      // 1. Remove currency symbols and whitespace
+      let cleanedValue = value.replace(/R\$|\s/g, '');
+
+      // 2. Standardize to use '.' as decimal separator
+      // Check if comma exists (likely pt-BR decimal separator)
+      if (cleanedValue.includes(',')) {
+          // Remove thousand separators (dots)
+          cleanedValue = cleanedValue.replace(/\./g, '');
+          // Replace comma decimal separator with dot
+          cleanedValue = cleanedValue.replace(',', '.');
+      } else {
+          // No comma found. Dot might be a decimal or thousand separator.
+          const dotCount = (cleanedValue.match(/\./g) || []).length;
+
+          if (dotCount === 1 && cleanedValue.endsWith('.')) {
+               // Handle case like "3500." -> treat as 3500
+               cleanedValue = cleanedValue.slice(0, -1);
+          } else if (dotCount === 1 && cleanedValue.indexOf('.') === cleanedValue.length - 3) {
+              // Single dot, two digits after it (e.g., "3500.00") -> Treat as decimal
+              // No change needed for parseFloat.
+          } else if (dotCount >= 1) {
+               // Multiple dots, or single dot not followed by 2 digits -> Assume dots are thousand separators
+               cleanedValue = cleanedValue.replace(/\./g, '');
+          }
+          // If no dots or commas (e.g., "3500"), cleanedValue remains "3500"
+      }
+
+      // 3. Parse the standardized string
+      const numericValue = parseFloat(cleanedValue);
+      return isNaN(numericValue) ? 0 : numericValue;
   };
 
   const handleSubmit = async (e: React.FormEvent) => { // Make async
     e.preventDefault();
 
-    // Helper function to format habitant range
-    const formatHabitanteRange = (start: string, end: string): string => {
-      const startNum = parseInt(start) || 0;
-      if (!end) {
-        return `Acima de ${startNum.toLocaleString('pt-BR')}`;
+    // Helper function to format habitant range using the actual lower and upper bounds
+    const formatHabitanteRange = (lower: number, upper: number | null): string => {
+      if (upper === null || upper === Infinity) {
+        return `Acima de ${lower.toLocaleString('pt-BR')}`;
       }
-      return `${startNum.toLocaleString('pt-BR')} - ${parseInt(end).toLocaleString('pt-BR')}`;
+      return `${lower.toLocaleString('pt-BR')} - ${upper.toLocaleString('pt-BR')}`;
     };
 
     try {
@@ -94,7 +189,21 @@ const CadastroADM = () => {
         fixadoPelaLei: deputadosLei,
         dataEntradaVigorLei: deputadosDataLei, // Keep as string for now
       };
-      await addDoc(collection(db, "SubsidiosDeputadosEstaduais"), deputadosData);
+      // Check if a document with the same AnoLegislatura exists
+      const deputadosQuery = query(
+        collection(db, "SubsidiosDeputadosEstaduais"),
+        where("AnoLegislatura", "==", deputadosLegislatura)
+      );
+      const deputadosSnapshot = await getDocs(deputadosQuery);
+
+      if (deputadosSnapshot.docs.length > 0) {
+        // Update existing document
+        const docRef = doc(db, "SubsidiosDeputadosEstaduais", deputadosSnapshot.docs[0].id);
+        await updateDoc(docRef, deputadosData);
+      } else {
+        // Create new document
+        await addDoc(collection(db, "SubsidiosDeputadosEstaduais"), deputadosData);
+      }
 
       // 2. Save Ministros STF Subsidio
       // Consider adding logic to update existing record for the same AnoLegislatura if needed
@@ -104,21 +213,61 @@ const CadastroADM = () => {
         fixadoPelaLei: ministrosLei,
         dataEntradaVigorLei: ministrosDataLei, // Keep as string for now
       };
-      await addDoc(collection(db, "SubsidiosMinistrosSTF"), ministrosData);
+     // Check if a document with the same AnoLegislatura exists
+      const ministrosQuery = query(
+        collection(db, "SubsidiosMinistrosSTF"),
+        where("AnoLegislatura", "==", ministrosLegislatura)
+      );
+      const ministrosSnapshot = await getDocs(ministrosQuery);
+
+      if (ministrosSnapshot.docs.length > 0) {
+        // Update existing document
+        const docRef = doc(db, "SubsidiosMinistrosSTF", ministrosSnapshot.docs[0].id);
+        await updateDoc(docRef, ministrosData);
+      } else {
+        // Create new document
+        await addDoc(collection(db, "SubsidiosMinistrosSTF"), ministrosData);
+      }
 
       // 3. Save Percentual Salario Dep (one document per range)
-      // Consider clearing existing ranges for this legislature before adding new ones if needed.
-      // For now, just adding new ones. A better approach might be to store ranges within the Deputados document.
+      // Delete existing documents for the same AnoLegislatura first
+      const percentualQuery = query(
+        collection(db, "PercentualSalarioDep"),
+        where("AnoLegislatura", "==", deputadosLegislatura)
+      );
+      const percentualSnapshot = await getDocs(percentualQuery);
+      for (const docToDelete of percentualSnapshot.docs) {
+        await deleteDoc(doc(db, "PercentualSalarioDep", docToDelete.id));
+      }
+
+      // Add new documents for each range, ensuring correct min/max assignment
       for (const range of percentageRanges) {
+        // Parse the potentially swapped values from state
+        const val1 = parseInt(range.maximo) || 0; // Value from the 'maximo' state field (might be lower bound)
+        const val2Str = range.minimo; // Value from the 'minimo' state field (might be upper bound or empty)
+        const val2 = val2Str ? parseInt(val2Str) : null; // Parse if not empty
+
+        let actualMinimo: number;
+        let actualMaximo: number | null;
+
+        if (val2 === null) {
+          // Open-ended range (e.g., "Acima de X")
+          actualMinimo = val1;
+          actualMaximo = null;
+        } else {
+          // Closed range, determine actual min and max
+          actualMinimo = Math.min(val1, val2);
+          actualMaximo = Math.max(val1, val2);
+        }
+
         const percentualData = {
-          // Assuming AnoLegislatura from Deputados is relevant here, or add a separate field if needed
-          AnoLegislatura: deputadosLegislatura, // Or maybe a general config identifier?
-          NrHabitantes: formatHabitanteRange(range.rangeStart, range.rangeEnd),
-          PercentualUtilizado: `${range.percentage}%`,
-          // Store raw values too if needed for calculations
-          RangeStart: parseInt(range.rangeStart) || 0,
-          RangeEnd: range.rangeEnd ? parseInt(range.rangeEnd) : null, // Use null for open-ended range
-          PercentageValue: parseInt(range.percentage) || 0,
+          AnoLegislatura: deputadosLegislatura,
+          // Use actualMinimo and actualMaximo for formatting and saving
+          NrHabitantes: formatHabitanteRange(actualMinimo, actualMaximo),
+          PercentualUtilizado: `${range.porcentagem}%`,
+          minimo: actualMinimo, // Save the smaller value as minimo
+          maximo: actualMaximo, // Save the larger value (or null) as maximo
+          porcentagemValor: parseInt(range.porcentagem) || 0,
         };
         await addDoc(collection(db, "PercentualSalarioDep"), percentualData);
       }
@@ -282,54 +431,54 @@ const CadastroADM = () => {
                   <CardTitle className="text-xl font-bold text-primary">
                     Percentuais do salário de Deputados Estaduais a ser utilizado para cálculo por habitante
                   </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {percentageRanges.map((range, index) => (
-                      <PercentageRangeItem
-                        key={range.id}
-                        index={index}
-                        rangeStart={range.rangeStart}
-                        rangeEnd={range.rangeEnd}
-                        percentage={range.percentage}
-                        onRangeStartChange={(value) =>
-                          updateRange(range.id, "rangeStart", value)
-                        }
-                        onRangeEndChange={(value) =>
-                          updateRange(range.id, "rangeEnd", value)
-                        }
-                        onPercentageChange={(value) =>
-                          updateRange(range.id, "percentage", value)
-                        }
-                        onRemove={() => handleRemoveRange(range.id)}
-                        isRemovable={percentageRanges.length > 1}
-                      />
-                    ))}
-                    <div className="mt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleAddRange}
-                        className="text-secondary border-secondary hover:text-secondary/95"
-                      >
-                        Adicionar Nova Faixa
-                      </Button>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {percentageRanges.map((range, index) => (
+                        <PercentageRangeItem
+                          key={range.id}
+                          index={index}
+                          maximo={range.maximo}
+                          minimo={range.minimo}
+                          porcentagem={range.porcentagem}
+                          onMaximoChange={(value) =>
+                            updateRange(range.id, "maximo", value)
+                          }
+                          onMinimoChange={(value) =>
+                            updateRange(range.id, "minimo", value)
+                          }
+                          onPorcentagemChange={(value) =>
+                            updateRange(range.id, "porcentagem", value)
+                          }
+                          onRemove={() => handleRemoveRange(range.id)}
+                          isRemovable={percentageRanges.length > 1}
+                        />
+                      ))}
+                      <div className="mt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAddRange}
+                          className="text-secondary border-secondary hover:text-secondary/95"
+                        >
+                          Adicionar Nova Faixa
+                        </Button>
+                      </div>
                     </div>
+                  </CardContent>
+                  </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
 
-            <div className="mt-6 flex justify-end">
-              <Button type="submit" className="bg-secondary hover:bg-secondary/90">
-                Salvar Dados
-              </Button>
+                  <div className="mt-6 flex justify-end">
+                    <Button type="submit" className="bg-secondary hover:bg-secondary/90">
+                      Salvar Dados
+                    </Button>
+                  </div>
+                </form>
+              </main>
             </div>
-          </form>
-        </main>
-      </div>
-    </div>
-  );
-};
+          </div>
+        );
+      };
 
-export default CadastroADM;
+      export default CadastroADM;
