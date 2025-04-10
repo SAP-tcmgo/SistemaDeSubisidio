@@ -105,7 +105,7 @@ const LoginPage = () => {
       toast({
         title: "Login realizado",
         description: "Login realizado com sucesso!",
-        className: "bg-green-500 text-white",
+        variant: "success", // Use success variant
       });
       navigate('/telaInicial');
     } catch (error: any) {

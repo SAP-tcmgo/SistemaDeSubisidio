@@ -106,7 +106,7 @@ const RegisterPage = () => {
       toast({
         title: "Cadastro realizado",
         description: "Cadastro realizado com sucesso!",
-        className: "bg-green-500 text-white",
+        variant: "success", // Use success variant
       });
       navigate('/login');
     } catch (error: any) {

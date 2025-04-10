@@ -17,6 +17,7 @@ import VerificationIcon from '../../components/VerificationIcon';
 import { db } from '../../firebase'; // Import db
 import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip for messages
+import InputMask from 'react-input-mask'; // Import InputMask
 
 // Interfaces for Firebase data
 interface SubsidioFirebase {
@@ -48,6 +49,38 @@ interface SubsidioItem {
   validationKey: string; // Key for the validation result state
 }
 
+
+const formatCurrency = (value: string): string => {
+  if (!value) return "";
+
+  // 1. Obter apenas os dígitos do valor inserido
+  let digits = value.replace(/\D/g, "");
+
+  // Se não houver dígitos, retorna string vazia
+  if (digits === "") return "";
+
+  // Opcional: Remover zeros à esquerda, exceto se for o único dígito
+  // Ex: "050" -> "50", "007" -> "7", mas "0" -> "0"
+  if (digits.length > 1 && digits.startsWith('0')) {
+     digits = digits.replace(/^0+/, "");
+     // Se após remover zeros ficar vazio (ex: input "000"), considera como "0"
+     if (digits === "") digits = "0";
+  }
+
+
+  // 2. Converter a string de dígitos para número, tratando os 2 últimos como centavos
+  // Ex: "5555" -> 55.55; "555" -> 5.55; "55" -> 0.55
+  const numValue = Number(digits) / 100;
+
+  // 3. Usar Intl.NumberFormat para formatação pt-BR confiável
+  let formatted = new Intl.NumberFormat('pt-BR', {
+    style: 'decimal', // 'decimal' para evitar o símbolo 'R$' no input
+    minimumFractionDigits: 2, // Sempre mostrar 2 casas decimais
+    maximumFractionDigits: 2, // Nunca mostrar mais de 2 casas decimais
+  }).format(numValue);
+
+  return formatted;
+};
 
 const Fixacao: React.FC = () => {
   const navigate = useNavigate();
@@ -299,7 +332,7 @@ const [formData, setFormData] = useState<FormData>({
                results.presidenteCamara = { isValid: false, message: `Subsídio (R$ ${presidenteCamaraValor.toFixed(2)}) excede o teto de ${applicablePercentual.porcentagemValor}% do Dep. Estadual (Teto: R$ ${tetoVereador.toFixed(2)}).` };
              } else if (tetoVereador >= Number(prefeitoValor)) { // This check now runs even if prefeitoValor is 0
                results.presidenteCamara = { isValid: false, message: `Teto calculado (R$ ${tetoVereador.toFixed(2)}) é maior ou igual ao subsídio do Prefeito (R$ ${prefeitoValor.toFixed(2)}).` };
-             }
+            }
           }
 
       } else {
@@ -477,14 +510,14 @@ const [formData, setFormData] = useState<FormData>({
                 <div className="mb-6 space-y-4">
                   <div className="flex flex-col md:flex-row gap-4 md:items-center">
                     <Label htmlFor="atoNormativo" className="text-base font-medium w-128">Ato Normativo que concedeu a Fixação dos Subsídios n.:</Label>
-                    <Input
-                      id="atoNormativo"
-                      name="atoNormativo"
+                    <InputMask
+                      mask="9.999/99"
+                      maskChar={null} // Use null instead of "_"
                       value={formData.atoNormativo}
                       onChange={handleInputChange}
                       className="w-[100px] md:max-w-xs"
-                      placeholder="1.500/00"
-                    />
+                      placeholder="x.xxx/xx"
+                    ></InputMask>
                   </div>
 
                   <div className="flex flex-col md:flex-row gap-4 md:items-center">
@@ -495,7 +528,7 @@ const [formData, setFormData] = useState<FormData>({
                       value={formData.legislatura}
                       onChange={handleInputChange}
                       className="w-[100px] md:max-w-xs"
-                      placeholder="2020/2024"
+                      placeholder="xxxx/xxxx"
                     />
                   </div>
                 </div>
@@ -519,12 +552,12 @@ const [formData, setFormData] = useState<FormData>({
                         <tr key={subsidio.validationKey}>
                           <td className="border p-2 text-left">{subsidio.cargo}</td>
                           <td className="border-b p-2 flex text-center justify-center">
-<Input
+                            <Input
                               type="text"
                               name={subsidio.valorKey}
                               value={formData[subsidio.valorKey] || ''}
                               onChange={(e) => {
-                                const rawValue = e.target.value;
+                                const rawValue = formatCurrency(e.target.value);
                                 setFormData({ ...formData, [subsidio.valorKey]: rawValue });
                               }}
                               className="w-32"
@@ -561,14 +594,15 @@ const [formData, setFormData] = useState<FormData>({
               <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-center">
                 <span className="text-base font-medium">Data da Fixação:</span>
                 <div className="relative max-w-xs">
-                  <Input 
-                    name="dataFixacao" 
-                    value={formData.dataFixacao} 
-                    onChange={handleInputChange} 
-                    className="pl-10" 
-                    placeholder="24/04/2000" 
+                  <Input
+                    type="date" // Change type to date
+                    name="dataFixacao"
+                    value={formData.dataFixacao}
+                    onChange={handleInputChange}
+                    className="pl-10" // Keep padding for icon if desired, or remove if native date picker icon is sufficient
+                    placeholder="DD/MM/AAAA" // Placeholder might not show for date type
                   />
-                  <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5" />
+                  <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5 pointer-events-none" /> {/* Make icon non-interactive */}
                 </div>
               </div>
 
@@ -677,17 +711,6 @@ const [formData, setFormData] = useState<FormData>({
                   })}
                 </div>
               </div>
-
-
-              <div className="mb-8 flex items-center gap-2">
-                <Checkbox 
-                  id="ressalvaLivre" 
-                  checked={formData.ressalvaLivre} 
-                  onCheckedChange={(checked) => handleCheckboxChange('ressalvaLivre', !!checked)} 
-                />
-                <label htmlFor="ressalvaLivre" className="font-medium">Inserir Ressalva Livre</label>
-              </div>
-
               {formData.ressalvaLivre && (
                 <div className="mb-8">
                   <h3 className="font-medium mb-2">Ressalva</h3>
