@@ -14,7 +14,7 @@ const Sidebar = ({ isOpen = false, setIsOpen }: SidebarProps) => {
   const sidebarLinks = [
     { name: 'Painel', icon: <LayoutDashboard size={20} />},
     { name: 'Análises', icon: <LineChart size={20} />},
-    { name: 'Projetos', icon: <FolderCog size={20} />},
+    { name: 'Projetos', icon: <FolderCog size={20} />, path: '/Projetos'},
     { name: 'Configurações', icon: <Settings size={20} />, path: '/configuracoes' },
   ];
 

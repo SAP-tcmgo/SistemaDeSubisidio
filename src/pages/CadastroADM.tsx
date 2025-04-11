@@ -441,10 +441,7 @@ const CadastroADM = () => {
                           id={`dep-val-${faixa.id}`}
                           placeholder="00.000,00"
                           value={faixa.valor}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                            const formattedValue = formatCurrency(e.target.value); 
-                            updateDeputadoFaixa(faixa.id, "valor", formattedValue);
-                          }}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const formattedValue = formatCurrency(e.target.value); updateDeputadoFaixa(faixa.id, "valor", formattedValue); }}
                           disabled={!isEditing}
                           className={!isEditing ? "bg-gray-100" : ""}
                         />
@@ -457,6 +454,7 @@ const CadastroADM = () => {
                           value={faixa.lei}
                           onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDeputadoFaixa(faixa.id, "lei", e.target.value)} // Add type
                           disabled={!isEditing}
+                          className={!isEditing ? "bg-gray-100 " : ""}
                         >
                           {(inputProps: any) => <Input {...inputProps} id={`dep-lei-${faixa.id}`} placeholder="x.xxx/xx" className={!isEditing ? 'bg-gray-100' : ''} />}
                         </InputMask>

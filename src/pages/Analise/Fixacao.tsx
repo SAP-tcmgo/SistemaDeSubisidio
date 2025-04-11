@@ -17,7 +17,6 @@ import VerificationIcon from '../../components/VerificationIcon';
 import { db } from '../../firebase'; // Import db
 import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip for messages
-import InputMask from 'react-input-mask'; // Import InputMask
 
 // Interfaces for Firebase data
 interface SubsidioFirebase {
@@ -78,6 +77,14 @@ const formatCurrency = (value: string): string => {
     minimumFractionDigits: 2, // Sempre mostrar 2 casas decimais
     maximumFractionDigits: 2, // Nunca mostrar mais de 2 casas decimais
   }).format(numValue);
+
+  // Exemplos:
+  // Input "5" -> numValue 0.05 -> formatted "0,05"
+  // Input "55" -> numValue 0.55 -> formatted "0,55"
+  // Input "555" -> numValue 5.55 -> formatted "5,55"
+  // Input "5555" -> numValue 55.55 -> formatted "55,55"
+  // Input "55555" -> numValue 555.55 -> formatted "555,55"
+  // Input "555555" -> numValue 5555.55 -> formatted "5.555,55"
 
   return formatted;
 };
@@ -510,14 +517,14 @@ const [formData, setFormData] = useState<FormData>({
                 <div className="mb-6 space-y-4">
                   <div className="flex flex-col md:flex-row gap-4 md:items-center">
                     <Label htmlFor="atoNormativo" className="text-base font-medium w-128">Ato Normativo que concedeu a Fixação dos Subsídios n.:</Label>
-                    <InputMask
-                      mask="9.999/99"
-                      maskChar={null} // Use null instead of "_"
+                    <Input
+                      id="atoNormativo"
+                      name="atoNormativo"
                       value={formData.atoNormativo}
                       onChange={handleInputChange}
                       className="w-[100px] md:max-w-xs"
                       placeholder="x.xxx/xx"
-                    ></InputMask>
+                    />
                   </div>
 
                   <div className="flex flex-col md:flex-row gap-4 md:items-center">
