@@ -4,7 +4,9 @@ import Header from '../../components/Header';
 import Switch from '../../components/Switch';
 import Sidebar from '../../components/Sidebar';
 import Icons from '../../components/Icons';
-import { municipiosGoias } from '../../dados/municipios';
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
+// import { municipiosGoias } from '../../dados/municipios'; // Remove static import
 import '../../styles/AppAnalise.css';
 import '../../styles/indexAnalise.css';
 import { useNavigate, useLocation } from 'react-router-dom'; // Removed Link
@@ -67,9 +69,14 @@ interface ExResponsavel {
 const MunicipioEResponsaveis: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+    const { instance, accounts } = useMsal();
+    const isAuthenticated = useIsAuthenticated();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [municipioList, setMunicipioList] = useState<any[]>([]); // State for municipio list
   const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
+    const [loadingMunicipios, setLoadingMunicipios] = useState(false); // Loading state for municipios
   const [apiError, setApiError] = useState<string | null>(null);
+    const [municipioError, setMunicipioError] = useState<string | null>(null); // Error state for municipios
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const lastFetchedMunicipioCodigoRef = useRef<string | null>(null); // Ref to track last fetched municipio
 
@@ -101,7 +108,7 @@ const MunicipioEResponsaveis: React.FC = () => {
 
   // State for section visibility toggles
   const [incluirExResponsaveis, setIncluirExResponsaveis] = useState<boolean>(false);
-  const [incluirOutrosResponsaveis, setIncluirOutrosResponsaveis] = useState<boolean>(false);
+    const [incluirOutrosResponsaveis, setIncluirOutrosResponsaveis] = useState<boolean>(false);
 
   // Local state for the "Outros Responsáveis" section inputs
   const [outroNome, setOutroNome] = useState<string>('');
@@ -114,13 +121,15 @@ const MunicipioEResponsaveis: React.FC = () => {
   const [chefeRHCamaraInput, setChefeRHCamaraInput] = useState<ResponsavelInput>({ nome: '', cpf: '', incluido: false });
   const [chefeRHPrefeituraInput, setChefeRHPrefeituraInput] = useState<ResponsavelInput>({ nome: '', cpf: '', incluido: false });
 
+    const sharepointListId = "3eba4d1e-9f82-4fbd-b0a3-f28d212093e1"; // ID da lista de municípios no SharePoint
+
   // --- API Fetching Logic ---
   // Modified to accept municipio name explicitly
   const fetchResponsaveis = useCallback(async (codigoMunicipio: string, nomeMunicipio: string) => {
     setLoadingResponsaveis(true);
     setApiError(null);
-    // Clear previous API results
-    setPresidenteInput({ nome: '', cpf: '', incluido: false });
+      // Clear previous API results
+      setPresidenteInput({ nome: '', cpf: '', incluido: false });
     setPrefeitoInput({ nome: '', cpf: '', incluido: false });
     setChefeRHCamaraInput({ nome: '', cpf: '', incluido: false });
     setChefeRHPrefeituraInput({ nome: '', cpf: '', incluido: false });
@@ -151,13 +160,13 @@ const MunicipioEResponsaveis: React.FC = () => {
 
 
     try {
-      // Use the proxy path configured in vite.config.ts
-      const response = await fetch(`/api/passaporte/${codigoMunicipio}/representacoes`);
-      if (!response.ok) {
-        // Include status code for better debugging if possible
-        throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
-      }
-      const data: RepresentacaoApi[] = await response.json();
+        // Use the proxy path configured in vite.config.ts
+        const response = await fetch(`/api/passaporte/${codigoMunicipio}/representacoes`);
+        if (!response.ok) {
+            // Include status code for better debugging if possible
+            throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+        }
+        const data: RepresentacaoApi[] = await response.json();
 
       const currentDate = new Date();
       currentDate.setUTCHours(0, 0, 0, 0); // Use UTC and set time to start of day for date-only comparison
@@ -275,15 +284,85 @@ const MunicipioEResponsaveis: React.FC = () => {
     } finally {
       setLoadingResponsaveis(false);
     }
-  }, [setResponsaveis, toast]); // Added toast dependency
+    }, [setResponsaveis, toast]); // Added toast dependency
+
+    // Function to fetch municipios from SharePoint
+    const fetchMunicipios = useCallback(async () => {
+        setLoadingMunicipios(true);
+        setMunicipioError(null);
+        try {
+            if (!isAuthenticated) {
+                console.warn("Not authenticated, cannot fetch municipios.");
+                return;
+            }
+
+            const response = await instance
+                .acquireTokenSilent({
+                    scopes: ["Sites.ReadWrite.All"],
+                    account: accounts[0],
+                })
+                .then(async (response) => {
+                    const graphEndpoint = `https://graph.microsoft.com/v1.0/sites/fbf1f1d0-319e-4e60-b400-bb5d01994fc8/lists/${sharepointListId}/items?expand=fields`;
+                    const apiResponse = await fetch(graphEndpoint, {
+                        headers: {
+                            Authorization: `Bearer ${response.accessToken}`,
+                            Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly",
+                        },
+                    });
+
+                    if (!apiResponse.ok) {
+                        throw new Error(`Erro ao buscar municípios: ${apiResponse.status} ${apiResponse.statusText}`);
+                    }
+
+                    const apiData = await apiResponse.json();
+                    console.log("GraphAuth: List Items:", apiData.value);
+
+                    const mappedMunicipios = apiData.value.map((item: any) => ({
+                        ID_Municipio: String(item.fields.ID_Municipio), // Use the value from the ID_Municipio field, ensure it's a string
+                        ID_IBGE: String(item.fields.ID_IBGE).replace(/\D/g, ''), // IBGE ID as string, remove non-digits
+                        Municipio: item.fields.Municipio, // Municipality name
+                    }));
+
+                    setMunicipioList(mappedMunicipios);
+                })
+                .catch((error) => {
+                    if (error instanceof InteractionRequiredAuthError) {
+                        // Fallback to interaction when silent call fails
+                        return instance.acquireTokenPopup({
+                            scopes: ["Sites.ReadWrite.All"],
+                        });
+                    } else {
+                        console.error("MSAL error when acquiring token: ", error);
+                        throw error; // Re-throw to be caught by the outer catch
+                    }
+                });
+        } catch (error) {
+            console.error("Erro ao buscar lista de municípios:", error);
+            setMunicipioError(error instanceof Error ? error.message : "Erro desconhecido ao buscar municípios.");
+            toast({
+                title: "Erro de API",
+                description: `Não foi possível buscar a lista de municípios: ${error instanceof Error ? error.message : "Erro desconhecido."}`,
+                variant: "destructive",
+            });
+        } finally {
+            setLoadingMunicipios(false);
+        }
+    }, [isAuthenticated, instance, accounts, toast]);
+
+    // Effect to fetch municipios on component mount and authentication change
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchMunicipios();
+        }
+    }, [isAuthenticated, fetchMunicipios]);
 
   // Effect to fetch data when municipio changes
   useEffect(() => {
     // Ensure both codigo and nome are present before fetching
-    if (municipio && municipio.codigo && municipio.nome) {
+    if (municipio && municipio.ID_IBGE && municipio.Municipio) {
       // Fetch only if the codigo is different from the last fetched one
-      if (municipio.codigo !== lastFetchedMunicipioCodigoRef.current) {
-        fetchResponsaveis(municipio.codigo, municipio.nome);
+      if (municipio.ID_IBGE !== lastFetchedMunicipioCodigoRef.current) {
+        fetchResponsaveis(municipio.ID_IBGE, municipio.Municipio);
       }
     } else {
       // Clear fields and reset ref if no municipio is selected
@@ -317,8 +396,8 @@ const MunicipioEResponsaveis: React.FC = () => {
 
   // Effect to set search input when municipio changes (from context or selection)
   useEffect(() => {
-    if (municipio && municipio.nome) {
-      setSearchInput(municipio.nome);
+    if (municipio && municipio.Municipio) {
+      setSearchInput(municipio.Municipio);
     } else {
       setSearchInput('');
     }
@@ -336,8 +415,8 @@ const MunicipioEResponsaveis: React.FC = () => {
   const normalizeString = (str: string) => 
     str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
-  const filteredMunicipios = municipiosGoias.filter(m =>
-    normalizeString(m.nome).includes(normalizeString(searchInput))
+    const filteredMunicipios = municipioList.filter(m =>
+    normalizeString(m.Municipio).includes(normalizeString(searchInput))
   );
 
   // Handles toggling the SWITCH for CURRENT responsibles
@@ -481,7 +560,7 @@ const MunicipioEResponsaveis: React.FC = () => {
   // --- Clear Screen Function ---
   const handleClearScreen = () => {
     // Reset context state
-    setMunicipio({ nome: '', codigo: '' }); // Reset to initial state object
+    setMunicipio({ ID_Municipio: '', ID_IBGE: '', Municipio: '' }); // Reset to new initial state object
     setAnoProcesso(''); // Or your initial state for anoProcesso
     setResponsaveis([]); // Clear the list of responsaveis in context
 
@@ -569,34 +648,35 @@ const MunicipioEResponsaveis: React.FC = () => {
                       />
                       <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" style={{ transform: 'translateY(4px)' }} />
                       {/* Dropdown for municipio selection */}
-                      {searchInput && searchInput !== municipio?.nome && filteredMunicipios.length > 0 && !loadingResponsaveis && (
+                      {searchInput && searchInput !== municipio?.Municipio && filteredMunicipios.length > 0 && !loadingResponsaveis && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
                           {filteredMunicipios.map((m) => (
                             <div
-                              key={m.codigo}
+                               key={m.ID_Municipio}
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                               onClick={() => {
-                                setMunicipio({ nome: m.nome, codigo: m.codigo }); // This triggers the useEffect for API call
-                                setSearchInput(m.nome); // Update input visually
+                                  setMunicipio({ ID_Municipio: m.ID_Municipio, ID_IBGE: m.ID_IBGE, Municipio: m.Municipio }); // This triggers the useEffect for API call
+                                setSearchInput(m.Municipio); // Update input visually
                               }}
                             >
-                              {m.nome}
+                              {m.Municipio}
                             </div>
                           ))}
                         </div>
                       )}
-                      {/* Loading indicator */}
-                      {loadingResponsaveis && (
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                              <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                          </div>
-                      )}
+                        {/* Loading indicator for municipios */}
+                        {loadingMunicipios && (
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                                <svg className="animate-spin h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        )}
                     </div>
-                    {/* API Error Display */}
-                    {apiError && <p className="text-red-500 text-xs mt-1">{apiError}</p>}
+                      {/* API Error Display for municipios */}
+                      {municipioError && <p className="text-red-500 text-xs mt-1">{municipioError}</p>}
+                      {apiError && <p className="text-red-500 text-xs mt-1">{apiError}</p>}
                   </div>
 
                   <div>

@@ -69,6 +69,10 @@
   .tribunal-card {
     @apply bg-white rounded-lg shadow-md p-6 transition-all duration-300;
   }
+
+  .tribunal-Dropdown {
+    @apply bg-white;
+  }
   
   .tribunal-sidebar-item {
     @apply flex items-center gap-2 p-3 rounded-md transition-colors duration-200 hover:bg-tribunal-gold/10 text-gray-700 hover:text-tribunal-gold;

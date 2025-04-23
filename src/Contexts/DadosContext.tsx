@@ -10,8 +10,9 @@ interface Responsavel {
 }
 
 interface Municipio {
-  nome: string;
-  codigo: string;
+  ID_Municipio: string;
+  ID_IBGE: string;
+  Municipio: string;
 }
 
 // New interface for the structure of included Colare laws
@@ -59,7 +60,7 @@ interface DadosProviderProps {
 
 export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
   const [numeroProcesso, setNumeroProcesso] = useState('');
-  const [municipio, setMunicipio] = useState<Municipio>({ nome: '', codigo: '' });
+  const [municipio, setMunicipio] = useState<Municipio>({ ID_Municipio: '', ID_IBGE: '', Municipio: '' }); // Update initial state
   const [anoProcesso, setAnoProcesso] = useState('');
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([]);
   const [doQueSeTrata, setDoQueSeTrata] = useState<string[]>([]);
@@ -70,7 +71,7 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
   // Função para resetar todos os dados
   const resetDados = useCallback(() => {
     setNumeroProcesso('');
-    setMunicipio({ nome: '', codigo: '' });
+    setMunicipio({ ID_Municipio: '', ID_IBGE: '', Municipio: '' }); // Update reset state
     setAnoProcesso('');
     setResponsaveis([]);
     setDoQueSeTrata([]);
@@ -100,7 +101,7 @@ export const DadosProvider: React.FC<DadosProviderProps> = ({ children }) => {
         const data = docSnap.data();
         // Atualiza todos os estados com os dados do Firebase
         setNumeroProcesso(numeroProc); // Mantém o número do processo atual
-        setMunicipio(data.municipio || { nome: '', codigo: '' });
+        setMunicipio(data.municipio || { ID_Municipio: '', ID_IBGE: '', Municipio: '' }); // Update loaded state default
         setAnoProcesso(data.anoProcesso || '');
         setResponsaveis(data.responsaveis || []);
         setDoQueSeTrata(data.doQueSeTrata || []);

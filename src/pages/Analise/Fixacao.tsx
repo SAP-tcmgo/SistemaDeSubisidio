@@ -78,14 +78,6 @@ const formatCurrency = (value: string): string => {
     maximumFractionDigits: 2, // Nunca mostrar mais de 2 casas decimais
   }).format(numValue);
 
-  // Exemplos:
-  // Input "5" -> numValue 0.05 -> formatted "0,05"
-  // Input "55" -> numValue 0.55 -> formatted "0,55"
-  // Input "555" -> numValue 5.55 -> formatted "5,55"
-  // Input "5555" -> numValue 55.55 -> formatted "55,55"
-  // Input "55555" -> numValue 555.55 -> formatted "555,55"
-  // Input "555555" -> numValue 5555.55 -> formatted "5.555,55"
-
   return formatted;
 };
 
@@ -393,16 +385,16 @@ const [formData, setFormData] = useState<FormData>({
 
   const vicios = [
     "1 - Ausência de Documentação Essencial",
-    "2 -A fixação dos subsídios do Prefeito, do Vice-Prefeito, dos Secretários e dos Vereadores, NÃO deu-se mediante lei de iniciativa da Câmara.",
+    "2 - A fixação dos subsídios do Prefeito, do Vice-Prefeito, dos Secretários e dos Vereadores, NÃO deu-se mediante lei de iniciativa da Câmara.",
     "3 - NÃO houve declaração do Prefeito no ato de sanção",
     "4 - A fixação do subsídio dos vereadores ocorreu por meio de outra norma.",
-    "5 -A Lei que fixou os subsídios dos vereadores ocorreu por meio de outra norma.",
-    "6 -Subsídio fixado excede ao teto regulamentar.",
+    "5 - A Lei que fixou os subsídios dos vereadores ocorreu por meio de outra norma.",
+    "6 - Subsídio fixado excede ao teto regulamentar.",
     "7 - Houve Desobediência ao Princípio da Anterioridade.",
-    "8 -houve alteração de norma para retirar a exigência da anterioridade",
-    "9 -Existe divergência entres als fixatório e Lei Municipal.",
-    "10 -O total da despesa com a remuneração dos vereadores ultrapassa o montante de 5% da receita do município.",
-    "11- Houve Desobedencia ao Princípio da Generalidade",
+    "8 - Houve alteração de norma para retirar a exigência da anterioridade",
+    "9 - Existe divergência entres als fixatório e Lei Municipal.",
+    "10 - O total da despesa com a remuneração dos vereadores ultrapassa o montante de 5% da receita do município.",
+    "11 - Houve Desobedencia ao Princípio da Generalidade",
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

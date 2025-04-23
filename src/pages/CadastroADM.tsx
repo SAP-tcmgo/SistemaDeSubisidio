@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
 import InputMask from 'react-input-mask'; // Import InputMask
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,11 +183,42 @@ const CadastroADM = () => {
             description: "Ocorreu um erro ao tentar carregar as informações do Firebase. Verifique o console para mais detalhes.",
         });
     }
-  }, [setDeputadosFaixas, setInitialDeputadosFaixas, setMinistrosFaixas, setInitialMinistrosFaixas, setPercentageRanges, setInitialPercentageRanges]); // Add dependency array to useCallback
+  }, [setDeputadosFaixas, setInitialDeputadosFaixas, setMinistrosFaixas, setInitialMinistrosFaixas, setPercentageRanges, setInitialPercentageRanges]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]); // Fetch data on mount
+
+  // Generate legislature options based on 4-year terms starting from 1997
+  const generateLegislatureOptions = () => {
+    const options = [];
+    const startYearFirstTerm = 1997;
+    const endYearLastTerm = 2028; // Target end year
+
+    let currentStartYear = startYearFirstTerm;
+    while (currentStartYear + 3 <= endYearLastTerm) {
+        const currentEndYear = currentStartYear + 3;
+        options.push(`${currentStartYear}/${currentEndYear}`);
+        currentStartYear += 4; // Move to the next 4-year term
+    }
+
+    // Ensure the final requested term is included if the loop didn't reach it exactly
+    if (!options.includes("2025/2028") && 2025 <= endYearLastTerm) {
+         // This check might be redundant if the loop logic is correct, but safe to include
+         // Check if 2025/2028 should be the last one based on loop logic
+         const lastGeneratedEnd = parseInt(options[options.length - 1]?.split('/')[1] || "0");
+         if (lastGeneratedEnd < 2028) {
+             // Add 2025/2028 if it wasn't generated and is within the target
+             // This scenario shouldn't happen with the current loop logic ending at 2028
+         }
+    }
+
+
+    return options.reverse(); // Reverse to get newest first
+  };
+
+  const legislatureOptions = generateLegislatureOptions();
+
 
   // --- Handlers for Deputados Faixas ---
   const handleAddDeputadoFaixa = () => {
@@ -422,21 +454,24 @@ const CadastroADM = () => {
               <CardContent className="space-y-4">
                 {deputadosFaixas.map((faixa: SubsidioFaixa, index: number) => ( // Add types
                   <div key={faixa.id} className="flex items-end gap-4 p-3 border rounded-md relative">
-                    {/* Inputs */}
+                    {/* Inputs - Reordered */}
                     <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <label htmlFor={`dep-leg-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Ano/Legislatura</label>
-                        <Input
-                          id={`dep-leg-${faixa.id}`}
-                          value={faixa.legislatura}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDeputadoFaixa(faixa.id, "legislatura", e.target.value)} // Add type
-                          placeholder="xxxx/xxxx"
+                       {/* 1. Lei de fixação */}
+                       <div className="md:col-span-1"> {/* Adjusted column span if needed */}
+                        <label htmlFor={`dep-lei-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Lei de fixação dos subsídios</label>
+                         <InputMask
+                          mask="9.999/99" // Keep mask as is unless specified otherwise
+                          maskChar={null}
+                          value={faixa.lei}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDeputadoFaixa(faixa.id, "lei", e.target.value)}
                           disabled={!isEditing}
-                          className={!isEditing ? 'bg-gray-100' : ''}
-                        />
+                        >
+                          {(inputProps: any) => <Input {...inputProps} id={`dep-lei-${faixa.id}`} placeholder="x.xxx/xx" className={`w-full ${!isEditing ? 'bg-gray-100' : ''}`} />}
+                        </InputMask>
                       </div>
+                       {/* 2. Valor */}
                       <div>
-                        <label htmlFor={`dep-val-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                        <label htmlFor={`dep-val-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Valor dos subsídios</label>
                         <Input
                           id={`dep-val-${faixa.id}`}
                           placeholder="00.000,00"
@@ -446,19 +481,7 @@ const CadastroADM = () => {
                           className={!isEditing ? "bg-gray-100" : ""}
                         />
                       </div>
-                      <div>
-                        <label htmlFor={`dep-lei-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Fixado pela Lei</label>
-                         <InputMask
-                          mask="9.999/99"
-                          maskChar={null} // Use null instead of "_"
-                          value={faixa.lei}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDeputadoFaixa(faixa.id, "lei", e.target.value)} // Add type
-                          disabled={!isEditing}
-                          className={!isEditing ? "bg-gray-100 " : ""}
-                        >
-                          {(inputProps: any) => <Input {...inputProps} id={`dep-lei-${faixa.id}`} placeholder="x.xxx/xx" className={!isEditing ? 'bg-gray-100' : ''} />}
-                        </InputMask>
-                      </div>
+                       {/* 3. Data */}
                       <div>
                         <label htmlFor={`dep-data-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Data entrada em vigor</label>
                         <div className="relative">
@@ -468,10 +491,30 @@ const CadastroADM = () => {
                             value={faixa.dataLei}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateDeputadoFaixa(faixa.id, "dataLei", e.target.value)} // Add type
                             disabled={!isEditing}
-                            className={`pl-10 ${!isEditing ? 'bg-gray-100' : ''}`}
+                            className={`pl-10 w-full ${!isEditing ? 'bg-gray-100' : ''}`}
                           />
                           <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                         </div>
+                      </div>
+                       {/* 4. Legislatura Dropdown */}
+                       <div>
+                        <label htmlFor={`dep-leg-${faixa.id}`} className="tribunal-Dropdown block text-sm font-medium text-gray-700 mb-1">Refere-se a qual legislatura municipal:</label>
+                        <Select
+                          value={faixa.legislatura}
+                          onValueChange={(value) => updateDeputadoFaixa(faixa.id, "legislatura", value)}
+                           disabled={!isEditing}
+                         >
+                           <SelectTrigger id={`dep-leg-${faixa.id}`} className={`w-full ${!isEditing ? 'bg-gray-100' : 'bg-white'}`}>
+                              <SelectValue placeholder="Selecione a legislatura" />
+                            </SelectTrigger>
+                           <SelectContent className="bg-white"> {/* Added bg-white */}
+                             {legislatureOptions.map(option => (
+                               <SelectItem key={option} value={option}>
+                                 {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     {/* Remove Button */}
@@ -513,21 +556,24 @@ const CadastroADM = () => {
               <CardContent className="space-y-4">
                 {ministrosFaixas.map((faixa: SubsidioFaixa, index: number) => ( // Add types
                   <div key={faixa.id} className="flex items-end gap-4 p-3 border rounded-md relative">
-                    {/* Inputs */}
+                    {/* Inputs - Reordered */}
                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                      <div>
-                        <label htmlFor={`min-leg-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Ano/Legislatura</label>
-                        <Input
-                          id={`min-leg-${faixa.id}`}
-                          value={faixa.legislatura}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMinistroFaixa(faixa.id, "legislatura", e.target.value)} // Add type
-                          placeholder="xxxx/xxxx"
+                       {/* 1. Lei de fixação */}
+                       <div className="md:col-span-1"> {/* Adjusted column span if needed */}
+                        <label htmlFor={`min-lei-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Lei de fixação dos subsídios</label>
+                         <InputMask
+                          mask="9.999/99"
+                          maskChar={null}
+                          value={faixa.lei}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMinistroFaixa(faixa.id, "lei", e.target.value)}
                           disabled={!isEditing}
-                          className={!isEditing ? 'bg-gray-100' : ''}
-                        />
+                        >
+                           {(inputProps: any) => <Input {...inputProps} id={`min-lei-${faixa.id}`} placeholder="x.xxx/xx" className={`w-full ${!isEditing ? 'bg-gray-100' : ''}`} />}
+                        </InputMask>
                       </div>
-<div>
-                        <label htmlFor={`min-val-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
+                       {/* 2. Valor */}
+                       <div>
+                        <label htmlFor={`min-val-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Valor dos subsídios</label>
                         <Input
                           id={`min-val-${faixa.id}`}
                           placeholder="00.000,00"
@@ -540,18 +586,7 @@ const CadastroADM = () => {
                           className={!isEditing ? "bg-gray-100" : ""}
                         />
                       </div>
-                      <div>
-                        <label htmlFor={`min-lei-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Fixado pela Lei</label>
-                         <InputMask
-                          mask="9.999/99"
-                          maskChar={null} // Use null instead of "_"
-                          value={faixa.lei}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMinistroFaixa(faixa.id, "lei", e.target.value)} // Add type
-                          disabled={!isEditing}
-                        >
-                           {(inputProps: any) => <Input {...inputProps} id={`min-lei-${faixa.id}`} placeholder="x.xxx/xx" className={!isEditing ? 'bg-gray-100' : ''} />}
-                        </InputMask>
-                      </div>
+                       {/* 3. Data */}
                       <div>
                         <label htmlFor={`min-data-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Data entrada em vigor</label>
                         <div className="relative">
@@ -561,10 +596,30 @@ const CadastroADM = () => {
                             value={faixa.dataLei}
                             onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateMinistroFaixa(faixa.id, "dataLei", e.target.value)} // Add type
                             disabled={!isEditing}
-                            className={`pl-10 ${!isEditing ? 'bg-gray-100' : ''}`}
+                            className={`pl-10 w-full ${!isEditing ? 'bg-gray-100' : ''}`}
                           />
                           <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                         </div>
+                      </div>
+                       {/* 4. Legislatura Dropdown */}
+                       <div>
+                        <label htmlFor={`min-leg-${faixa.id}`} className="block text-sm font-medium text-gray-700 mb-1">Refere-se a qual legislatura municipal:</label>
+                        <Select
+                          value={faixa.legislatura}
+                          onValueChange={(value) => updateMinistroFaixa(faixa.id, "legislatura", value)}
+                           disabled={!isEditing}
+                         >
+                           <SelectTrigger id={`min-leg-${faixa.id}`} className={`w-full ${!isEditing ? 'bg-gray-100' : 'bg-white'}`}>
+                              <SelectValue placeholder="Selecione a legislatura" />
+                            </SelectTrigger>
+                           <SelectContent className="bg-white"> {/* Added bg-white */}
+                             {legislatureOptions.map(option => (
+                               <SelectItem key={option} value={option}>
+                                 {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     {/* Remove Button */}
