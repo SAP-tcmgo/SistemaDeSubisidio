@@ -583,7 +583,7 @@ const MunicipioEResponsaveis: React.FC = () => {
   };
 
   const handleNext = () => {
-    navigate('/TratamentoLeis');
+    navigate('/TratamentoProcesso');
   };
 
 

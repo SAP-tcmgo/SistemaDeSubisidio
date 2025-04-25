@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react'; // Added useEffect, useMemo
-import { Calendar, Info } from 'lucide-react'; // Added Info icon for messages
+import React, { useState, useEffect, useMemo, useCallback } from 'react'; // Added useEffect, useMemo, useCallback
+import { Calendar, Info, PlusCircle } from 'lucide-react'; // Added Info icon for messages, PlusCircle for dialog trigger
 import Header from '../../components/Header';
 import Sidebar from '../../components/Sidebar';
+import { Button } from '@/components/ui/button'; // Added Button
 import BreadcrumbNav from '../../components/BreadcrumbNav'; // Added BreadcrumbNav
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"; // Added Table components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"; // Added Dialog components
+import { ScrollArea } from '@/components/ui/scroll-area'; // Added ScrollArea for dialog
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch'; // Added Switch
 import { useNavigate } from 'react-router-dom'; // Added useNavigate
@@ -15,7 +19,7 @@ import '../../styles/AppAnalise.css'; // Added styles
 import '../../styles/indexAnalise.css';
 import VerificationIcon from '../../components/VerificationIcon';
 import { db } from '../../firebase'; // Import db
-import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
+import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore'; // Import Firestore functions, Timestamp
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip for messages
 
 // Interfaces for Firebase data
@@ -35,6 +39,35 @@ interface PercentualFirebase {
   porcentagemValor: number; // Corresponds to PercentageValue
 }
 
+// Interface for LeisGenericas from Firebase (based on provided structure)
+interface LeiGenerica {
+  id: string; // Firebase document ID
+  ID_Migracao?: string; // Original SharePoint ID if migrated
+  ID?: string;
+  ID_Espelho?: string;
+  ID_Municipio: string; // Used for filtering
+  Municipio?: string;
+  Num_Lei?: number;
+  Ano_Lei?: number;
+  Mes_Data_Base?: string;
+  Indice_Correcao?: string;
+  Num_Processo?: number;
+  Ano_Processo?: number;
+  Data_Inicial?: string; // ISO string or Firestore Timestamp
+  Data_Final?: string; // ISO string or Firestore Timestamp
+  Anotacao?: string;
+  Situacao?: string;
+  Conclusao?: string;
+  Historico_Atualizacao?: string;
+  Criado_por?: string;
+  Modificado?: Timestamp; // Firestore Timestamp
+  Modificado_por?: string;
+  // Fields potentially needed for Fixacao/Revisao tables (might be in same collection or different)
+  Legislatura?: string;
+  Cargo?: string;
+  Subsidio?: number; // Assuming number for value
+}
+
 // Interface for validation results
 interface ValidationResult {
   isValid: boolean;
@@ -46,14 +79,59 @@ interface SubsidioItem {
   cargo: string;
   valorKey: string; // Key in formData for the value input
   validationKey: string; // Key for the validation result state
-}
+} // <-- Added missing closing brace
+
+// Helper to format Firestore Timestamp or date string
+const formatDate = (dateInput: string | Timestamp | undefined | null): string => {
+  if (!dateInput) return '-';
+  let date: Date | null = null;
+  if (dateInput instanceof Timestamp) {
+    date = dateInput.toDate();
+  } else if (typeof dateInput === 'string') {
+    try {
+      date = new Date(dateInput);
+      // Check if the date is valid after parsing
+      if (isNaN(date.getTime())) {
+        // If invalid, try parsing as DD/MM/YYYY (common manual input format)
+        const parts = dateInput.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+          const year = parseInt(parts[2], 10);
+          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+            date = new Date(Date.UTC(year, month, day)); // Use UTC
+            if (isNaN(date.getTime())) date = null; // Still invalid
+          } else {
+             date = null;
+          }
+        } else {
+           date = null;
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing date string:", dateInput, e);
+      date = null;
+    }
+  }
+
+  if (date && !isNaN(date.getTime())) {
+    // Use UTC methods to avoid timezone shifts affecting the date part
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+    const year = date.getUTCFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  return '-'; // Return placeholder if date is invalid or null
+};
 
 
-const formatCurrency = (value: string): string => {
-  if (!value) return "";
+const formatCurrency = (value: string | number | undefined | null): string => {
+  if (value === null || value === undefined || value === "") return "";
+
+  let valueStr = String(value);
 
   // 1. Obter apenas os dígitos do valor inserido
-  let digits = value.replace(/\D/g, "");
+  let digits = valueStr.replace(/\D/g, "");
 
   // Se não houver dígitos, retorna string vazia
   if (digits === "") return "";
@@ -83,20 +161,29 @@ const formatCurrency = (value: string): string => {
 
 const Fixacao: React.FC = () => {
   const navigate = useNavigate();
-  const { numeroProcesso, numeroHabitantes } = useDados(); // Get numeroHabitantes
+  const { numeroProcesso, numeroHabitantes, municipio } = useDados(); // Get numeroHabitantes AND municipio
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // State for table visibility checkboxes
-  const [showLeisInflacionarias, setShowLeisInflacionarias] = useState<boolean>(true); // Default to true?
+  const [showLeisInflacionarias, setShowLeisInflacionarias] = useState<boolean>(true); // Default to true
   const [showLeisFixacao, setShowLeisFixacao] = useState<boolean>(false);
   const [showLeisRevisao, setShowLeisRevisao] = useState<boolean>(false);
+
+  // State for fetched laws (Política Inflacionária)
+  const [leisInflacionarias, setLeisInflacionarias] = useState<LeiGenerica[]>([]);
+  const [loadingLeis, setLoadingLeis] = useState<boolean>(false);
+  const [leisError, setLeisError] = useState<string | null>(null);
+
+  // State for the law details dialog
+  const [isLawDetailOpen, setIsLawDetailOpen] = useState<boolean>(false);
+  const [selectedLawDetail, setSelectedLawDetail] = useState<LeiGenerica | null>(null);
 
   // State for fetched Firebase data
   const [subsidioDeputadoEstadual, setSubsidioDeputadoEstadual] = useState<SubsidioFirebase | null>(null);
   const [subsidioMinistroSTF, setSubsidioMinistroSTF] = useState<SubsidioFirebase | null>(null);
   const [percentuaisSalarioDep, setPercentuaisSalarioDep] = useState<PercentualFirebase[]>([]);
 
-  // State for validation results
+    // State for validation results
   const [validationResults, setValidationResults] = useState<{ [key: string]: ValidationResult }>({
     prefeito: { isValid: true, message: null },
     vicePrefeito: { isValid: true, message: null },
@@ -107,7 +194,8 @@ const Fixacao: React.FC = () => {
 
 
   interface FormData {
-  atoNormativo: string;
+  atoNormativoNumero: string; // Changed from atoNormativo
+  atoNormativoAno: string; // Added for year
   legislatura: string;
   dataFixacao: string;
   anotacaoPlanilha: boolean;
@@ -125,10 +213,11 @@ const Fixacao: React.FC = () => {
 }
 
 const [formData, setFormData] = useState<FormData>({
-    atoNormativo: '',
+    atoNormativoNumero: '', // Changed from atoNormativo
+    atoNormativoAno: '', // Added for year
     legislatura: '',
     dataFixacao: '',
-    anotacaoPlanilha: false,
+    anotacaoPlanilha: false, // Keep default as false unless specified otherwise
     numeroLei: '',
     numeroAcordao: '',
     ressalvaLivre: false,
@@ -195,28 +284,23 @@ const [formData, setFormData] = useState<FormData>({
 
   // TODO: Implement handleClearScreen if needed
   const handleClearScreen = () => {
-     console.log("Clear screen action triggered");
-     // Reset formData, selectedVicio etc.
      setFormData({
-       atoNormativo: '',
+       atoNormativoNumero: '', // Changed from atoNormativo
+       atoNormativoAno: '', // Added for year
        legislatura: '',
        dataFixacao: '',
-       anotacaoPlanilha: true,
+       anotacaoPlanilha: false, // Reset to default
        numeroLei: '',
        numeroAcordao: '',
        ressalvaLivre: false,
-       // Also reset vicios state
        viciosChecks: {},
        viciosDetails: {},
-       // Reset subsidy values explicitly if they are part of the initial state structure
        'valor-0': '',
        'valor-1': '',
        'valor-2': '',
        'valor-3': '',
        'valor-4': '',
      });
-     // setSelectedVicio(0); // Removed as setSelectedVicio is not defined
-      // Add toast notification if desired
   };
 
   // Fetch Firebase data based on legislatura
@@ -404,13 +488,69 @@ const [formData, setFormData] = useState<FormData>({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+
     if (name.startsWith('valor-')) {
-      const numericValue = value.replace(/[^\d,]/g, ''); // Allow only digits and comma
-      setFormData(prev => ({ ...prev, [name]: numericValue }));
+      const formattedValue = formatCurrency(value);
+      setFormData(prev => ({ ...prev, [name]: formattedValue }));
+    } else if (name === 'atoNormativoNumero' || name === 'atoNormativoAno') {
+      // Allow only digits and limit length to 4
+      const digits = value.replace(/\D/g, '');
+      setFormData(prev => ({ ...prev, [name]: digits.slice(0, 4) }));
+    } else if (name === 'legislatura') {
+      // Apply xxxx-xxxx mask
+      const digits = value.replace(/\D/g, '');
+      let maskedValue = digits;
+      if (digits.length > 4) {
+        maskedValue = `${digits.slice(0, 4)}-${digits.slice(4, 8)}`;
+      }
+      setFormData(prev => ({ ...prev, [name]: maskedValue }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
+
+  // Fetch Laws (Política Inflacionária) when municipio changes
+  const fetchLeisInflacionarias = useCallback(async () => {
+    if (!municipio || !municipio.ID_Municipio) {
+      setLeisInflacionarias([]); // Clear if no municipio selected
+      return;
+    }
+
+    setLoadingLeis(true);
+    setLeisError(null);
+    console.log(`Fetching laws for municipio ID: ${municipio.ID_Municipio}`);
+
+    try {
+      const leisCollectionRef = collection(db, 'leis');
+      const q = query(leisCollectionRef, where("ID_Municipio", "==", municipio.ID_Municipio));
+
+      const querySnapshot = await getDocs(q);
+      const fetchedLeis: LeiGenerica[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as Omit<LeiGenerica, 'id'>;
+        // Client-side filter: Check if it looks like a "Política Inflacionária" law
+        if (data.Indice_Correcao || data.Mes_Data_Base) {
+          fetchedLeis.push({ id: doc.id, ...data });
+        }
+      });
+
+      console.log(`Fetched ${fetchedLeis.length} 'Política Inflacionária' laws.`);
+      setLeisInflacionarias(fetchedLeis);
+
+    } catch (error) {
+      console.error("Erro ao buscar leis do Firebase:", error);
+      const errorMsg = error instanceof Error ? error.message : "Erro desconhecido.";
+      setLeisError(`Falha ao buscar leis: ${errorMsg}`);
+      setLeisInflacionarias([]);
+      // Consider adding a toast notification here
+    } finally {
+      setLoadingLeis(false);
+    }
+  }, [municipio]); // Dependency: re-run when municipio changes
+
+  useEffect(() => {
+    fetchLeisInflacionarias();
+  }, [fetchLeisInflacionarias]); // Fetch on mount and when municipio changes
 
   const handleCheckboxChange = (name: string, checked: boolean) => {
     setFormData(prev => ({ ...prev, [name]: checked }));
@@ -474,7 +614,7 @@ const [formData, setFormData] = useState<FormData>({
   };
 
   const handleBack = () => {
-    navigate('/TratamentoLeis');
+    navigate('/TratamentoProcesso');
   };
 
   const handleNext = () => {
@@ -513,27 +653,43 @@ const [formData, setFormData] = useState<FormData>({
                 
 
                   <div className="mb-6 space-y-4">
-                  <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                    <Label htmlFor="atoNormativo" className="text-base font-medium w-128">Ato Normativo que concedeu a Fixação dos Subsídios n.:</Label>
-                    <Input
-                      id="atoNormativo"
-                      name="atoNormativo"
-                      value={formData.atoNormativo}
-                      onChange={handleInputChange}
-                      className="w-[100px] md:max-w-xs"
-                      placeholder="x.xxx/xx"
-                    />
-                  </div>
+                    {/* Ato Normativo Row */}
+                    <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                      <Label htmlFor="atoNormativoNumero" className="text-base font-medium whitespace-nowrap">Número do Ato Normativo que concedeu a Fixação dos Subsídios:</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="atoNormativoNumero"
+                          name="atoNormativoNumero"
+                          value={formData.atoNormativoNumero}
+                          onChange={handleInputChange}
+                          className="w-20"
+                          placeholder="xxxx"
+                          maxLength={4}
+                        />
+                        <Label htmlFor="atoNormativoAno" className="text-base font-medium whitespace-nowrap mr-2 ml-10">Ano:</Label>
+                        <Input
+                          id="atoNormativoAno"
+                          name="atoNormativoAno"
+                          value={formData.atoNormativoAno}
+                          onChange={handleInputChange}
+                          className="w-20"
+                          placeholder="xxxx"
+                          maxLength={4}
+                        />
+                      </div>
+                    </div>
 
-                  <div className="flex flex-col md:flex-row gap-4 md:items-center">
-                    <Label htmlFor="legislatura" className="text-base font-medium w-18">A fixação dos subsídios refere-se a qual legislatura:</Label>
-                    <Input
-                      id="legislatura"
-                      name="legislatura"
-                      value={formData.legislatura}
-                      onChange={handleInputChange}
-                      className="w-[100px] md:max-w-xs"
-                      placeholder="xxxx/xxxx"
+                    {/* Legislatura Row */}
+                    <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                      <Label htmlFor="legislatura" className="text-base font-medium whitespace-nowrap">A fixação dos subsídios refere-se a qual legislatura:</Label>
+                      <Input
+                        id="legislatura"
+                        name="legislatura"
+                        value={formData.legislatura}
+                        onChange={handleInputChange}
+                        className="w-28" // Adjusted width for mask
+                        placeholder="xxxx-xxxx"
+                        maxLength={9} // 4 digits + hyphen + 4 digits
                     />
                   </div>
                 </div>              
@@ -610,8 +766,9 @@ const [formData, setFormData] = useState<FormData>({
                     <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5 pointer-events-none" /> {/* Make icon non-interactive */}
                   </div>
                 </div>
-                
-                <div className="mb-4 flex items-center space-x-4">
+
+                {/* --- Law Tables Section --- */}
+                <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="visualizarInflacionaria"
@@ -638,8 +795,131 @@ const [formData, setFormData] = useState<FormData>({
                   </div>
                 </div>
 
+                {/* Table 1: Política Inflacionária */}
+                {showLeisInflacionarias && (
+                  <div className="mb-8">
+                    <h3 className="text-md font-semibold mb-2 text-gray-800">
+                      Lista resumida das Leis acerca da política inflacionária do município {municipio?.Municipio || '...'}
+                    </h3>
+                    {loadingLeis && <p className="text-sm text-gray-500">Carregando leis...</p>}
+                    {leisError && <p className="text-sm text-red-500">{leisError}</p>}
+                    {!loadingLeis && !leisError && (
+                      <Table className="border">
+                        <TableHeader>
+                          <TableRow className="bg-gray-100">
+                            <TableHead className="border px-2 py-1 text-center">Número da Lei</TableHead>
+                            <TableHead className="border px-2 py-1 text-center">Índice de Correção</TableHead>
+                            <TableHead className="border px-2 py-1 text-center">Mês Data Base</TableHead>
+                            <TableHead className="border px-2 py-1 text-center">Data Inicial</TableHead>
+                            <TableHead className="border px-2 py-1 text-center">Data Final</TableHead>
+                            <TableHead className="border px-2 py-1 text-center">Detalhes</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {leisInflacionarias.length > 0 ? (
+                            leisInflacionarias.map((lei) => (
+                              <TableRow key={lei.id}>
+                                <TableCell className="border px-2 py-1 text-center">{lei.Num_Lei || '-'}/{lei.Ano_Lei || '-'}</TableCell>
+                                <TableCell className="border px-2 py-1 text-center">{lei.Indice_Correcao || '-'}</TableCell>
+                                <TableCell className="border px-2 py-1 text-center">{lei.Mes_Data_Base || '-'}</TableCell>
+                                <TableCell className="border px-2 py-1 text-center">{formatDate(lei.Data_Inicial)}</TableCell>
+                                <TableCell className="border px-2 py-1 text-center">{formatDate(lei.Data_Final)}</TableCell>
+                                <TableCell className="border px-2 py-1 text-center">
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedLawDetail(lei);
+                                        setIsLawDetailOpen(true); // Open dialog
+                                      }}
+                                      className="text-blue-600 hover:text-blue-800"
+                                    >
+                                      <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                  </DialogTrigger>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={6} className="border px-2 py-1 text-center text-gray-500">
+                                Nenhuma lei de política inflacionária encontrada para este município.
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                )}
+
+                {/* Table 2: Fixação */}
+                {showLeisFixacao && (
+                  <div className="mb-8">
+                    <h3 className="text-md font-semibold mb-2 text-gray-800">
+                      Lista resumida das Leis de Fixação de Subsídios do município {municipio?.Municipio || '...'}
+                    </h3>
+                    <Table className="border">
+                      <TableHeader>
+                        <TableRow className="bg-gray-100">
+                          <TableHead className="border px-2 py-1 text-center">Legislatura</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Número da Lei</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Cargo</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Subsídio</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Nº do Processo</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Situação</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Conclusão</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Detalhes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Data will be added later */}
+                        <TableRow>
+                          <TableCell colSpan={8} className="border px-2 py-1 text-center text-gray-500">
+                            Nenhuma lei de fixação encontrada (funcionalidade futura).
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Table 3: Revisão Geral Anual */}
+                {showLeisRevisao && (
+                  <div className="mb-8">
+                    <h3 className="text-md font-semibold mb-2 text-gray-800">
+                      Lista resumida das Leis de Revisão Geral Anual de Subsídios do município {municipio?.Municipio || '...'}
+                    </h3>
+                    <Table className="border">
+                      <TableHeader>
+                        <TableRow className="bg-gray-100">
+                          <TableHead className="border px-2 py-1 text-center">Legislatura</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Número da Lei</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Cargo</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Subsídio</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Nº do Processo</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Situação</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Conclusão</TableHead>
+                          <TableHead className="border px-2 py-1 text-center">Detalhes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {/* Data will be added later */}
+                        <TableRow>
+                          <TableCell colSpan={8} className="border px-2 py-1 text-center text-gray-500">
+                            Nenhuma lei de revisão geral anual encontrada (funcionalidade futura).
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                {/* --- End Law Tables Section --- */}
+
+
                 <div className="mb-6 flex items-center gap-2 border p-4 rounded bg-blue-50">
-                  <Checkbox 
+                  <Checkbox
                     id="anotacao" 
                     checked={formData.anotacaoPlanilha} 
                     onCheckedChange={(checked) => handleCheckboxChange('anotacaoPlanilha', !!checked)} 
@@ -669,6 +949,7 @@ const [formData, setFormData] = useState<FormData>({
                   </p>
                 </div>
                 )} {/* Correctly close the conditional block here */}
+
 
                 <div className="mb-8">
                   <h2 className="text-lg font-bold mb-4">Vícios ou Ressalvas da Fixação de Subsídios:</h2>
@@ -752,8 +1033,62 @@ const [formData, setFormData] = useState<FormData>({
 
                 <div className="mb-8">
                   <h2 className="text-lg font-semibold mb-4">Conferência do Texto de Fixação de Subsídios</h2>
-                  <div className="border rounded-md w-full h-64"></div>
+                  <div className="border rounded-md w-full h-64"></div> {/* Placeholder */}
                 </div>
+
+                {/* Law Detail Dialog */}
+                <Dialog open={isLawDetailOpen} onOpenChange={setIsLawDetailOpen}>
+                  <DialogContent className="sm:max-w-[600px] bg-white">
+                    <DialogHeader>
+                      <DialogTitle className="text-center text-lg font-semibold text-gray-800">
+                        Detalhes da Lei {selectedLawDetail?.Num_Lei || '-'}/{selectedLawDetail?.Ano_Lei || '-'}
+                      </DialogTitle>
+                      <DialogDescription className="text-center text-sm text-gray-500">
+                        Município: {selectedLawDetail?.Municipio || municipio?.Municipio || 'N/A'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    {selectedLawDetail ? (
+                      <ScrollArea className="max-h-[60vh] p-4 border rounded-md">
+                        <div className="space-y-2 text-sm">
+                          {Object.entries(selectedLawDetail).map(([key, value]) => {
+                            // Skip internal ID fields or empty values for cleaner display
+                            if (key === 'id' || key === 'ID_Migracao' || value === null || value === undefined || value === '') return null;
+
+                            let displayValue = value;
+                            // Format specific fields
+                            if (key === 'Modificado' && value instanceof Timestamp) {
+                              displayValue = formatDate(value);
+                            } else if ((key === 'Data_Inicial' || key === 'Data_Final') && (typeof value === 'string' || value instanceof Timestamp)) {
+                              displayValue = formatDate(value);
+                            } else if (typeof value === 'number' && (key === 'Num_Lei' || key === 'Ano_Lei' || key === 'Num_Processo' || key === 'Ano_Processo')) {
+                               displayValue = String(value); // Display numbers directly
+                            } else if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+                               // Skip complex objects/arrays if not handled specifically
+                               return null;
+                            }
+
+                            // Simple key formatting (replace underscores, capitalize)
+                            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                            return (
+                              <div key={key} className="grid grid-cols-3 gap-2 border-b pb-1">
+                                <span className="font-medium text-gray-600 col-span-1">{displayKey}:</span>
+                                <span className="text-gray-800 col-span-2 break-words">{String(displayValue)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-center text-gray-500">Nenhum detalhe de lei selecionado.</p>
+                    )}
+                    <div className="flex justify-end mt-4">
+                       <Button variant="outline" onClick={() => setIsLawDetailOpen(false)}>Fechar</Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                {/* End Law Detail Dialog */}
+
               </div>
             </div>
           </main>

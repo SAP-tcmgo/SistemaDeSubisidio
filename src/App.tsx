@@ -16,7 +16,7 @@ const TelaInicial = lazy(() => import("./pages/TelaInicial"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Painel = lazy(() => import("./pages/Painel"));
 const DadosMunicipioEResponsaveis = lazy(() => import("./pages/Analise/MunicipioEResponsaveis"));
-const TratamentoLeis = lazy(() => import("./pages/Analise/TratamentoLeis"));
+const TratamentoProcesso = lazy(() => import("./pages/Analise/TratamentoProcesso"));
 const Fixacao = lazy(() => import("./pages/Analise/Fixacao"));
 const CadastroADM = lazy(() => import("./pages/CadastroADM"))
 const GraphAuth = lazy(() => import("./pages/Projetos"))
@@ -44,7 +44,7 @@ const App = () => {
                                     <Route path="/configuracoes" element={<Configuracoes />} />
                                     <Route path="/painel" element={<Painel />} />
                                     <Route path="/MunicipioEResponsaveis" element={<DadosMunicipioEResponsaveis />} />
-                                    <Route path="/TratamentoLeis" element={<TratamentoLeis />} />
+                                    <Route path="/TratamentoProcesso" element={<TratamentoProcesso />} />
                                     <Route path="/Fixacao" element={<Fixacao />} />
                                     <Route path="/CadastroADM" element={<CadastroADM />} />
                                     <Route path="/Projetos" element={<GraphAuth />} />

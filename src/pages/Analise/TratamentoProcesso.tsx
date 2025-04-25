@@ -144,8 +144,8 @@ const TratamentoProcesso: React.FC = () => { // Renamed component conceptually
           <Header toggleSidebar={toggleSidebar} />
           </div>
 
-          {/* Revert BreadcrumbNav currentPage to match expected type */}
-          <BreadcrumbNav currentPage="Tratamento Leis" sidebarOpen={sidebarOpen} />
+          {/* Update BreadcrumbNav currentPage */}
+          <BreadcrumbNav currentPage="Tratamento Processo" sidebarOpen={sidebarOpen} />
 
           <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
               <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden ">

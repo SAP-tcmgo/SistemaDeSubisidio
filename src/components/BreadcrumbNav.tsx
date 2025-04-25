@@ -24,7 +24,7 @@ interface BreadcrumbNavProps {
 // Define the sequence and paths for the analysis steps
 const analysisSteps: { name: AnaliseStep; path: string }[] = [
   { name: 'Município e Responsáveis', path: '/MunicipioEResponsaveis' },
-  { name: 'Tratamento Processo', path: '/TratamentoLeis' },
+  { name: 'Tratamento Processo', path: '/TratamentoProcesso' },
   { name: 'Fixação', path: '/Fixacao' },
 ];
 
