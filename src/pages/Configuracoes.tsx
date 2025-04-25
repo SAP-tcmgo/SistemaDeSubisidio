@@ -14,7 +14,10 @@ import { Button } from "../components/ui/button";
 import { Form, FormControl,  FormField, FormItem, FormLabel } from '../components/ui/form';
 import { useForm } from "react-hook-form";
 import { useUser } from '../Contexts/UserContext';
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast";
+// Import MSAL hooks (will be needed for migration logic)
+import { useMsal } from "@azure/msal-react";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 
 export default function Configuracoes() {
   const navigate = useNavigate();
@@ -24,6 +27,15 @@ export default function Configuracoes() {
   const [newRole, setNewRole] = useState('');
   const [roles, setRoles] = useState<string[]>([]);
   const { userRoles, userName, userEmail, usercpf, updateUser } = useUser();
+  const { instance, accounts } = useMsal(); // MSAL instance for migration
+  const { toast } = useToast(); // Moved toast init here
+
+  // State for migration status
+  const [isMigratingLeis, setIsMigratingLeis] = useState(false);
+  const [isMigratingMunicipios, setIsMigratingMunicipios] = useState(false);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
+  const [migrationSuccess, setMigrationSuccess] = useState<string | null>(null);
+
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -57,7 +69,7 @@ export default function Configuracoes() {
     }
   };
 
-  const { toast } = useToast()
+  // Removed duplicate toast init
 
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
@@ -159,6 +171,205 @@ export default function Configuracoes() {
       });
     }
 };
+
+  // --- Migration Functions ---
+  const acquireGraphToken = async () => {
+    if (!accounts || accounts.length === 0) {
+      throw new Error("Nenhuma conta MSAL encontrada. Faça login primeiro.");
+    }
+    const request = {
+      scopes: ["Sites.ReadWrite.All"], // Or Sites.Read.All if sufficient
+      account: accounts[0],
+    };
+
+    try {
+      const response = await instance.acquireTokenSilent(request);
+      return response.accessToken;
+    } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        console.warn("Silent token acquisition failed. Attempting popup.");
+        try {
+          const response = await instance.acquireTokenPopup(request);
+          return response.accessToken;
+        } catch (popupError) {
+          console.error("Popup token acquisition failed:", popupError);
+          throw new Error("Falha ao obter token de acesso via popup.");
+        }
+      } else {
+        console.error("Token acquisition failed:", error);
+        throw new Error("Falha ao obter token de acesso.");
+      }
+    }
+  };
+
+  const handleMigrarLeis = async () => {
+    setIsMigratingLeis(true);
+    setMigrationError(null);
+    setMigrationSuccess(null);
+    let addedCount = 0;
+    let skippedCount = 0;
+    console.log("Iniciando migração de Leis...");
+    toast({ title: "Iniciando migração de Leis..." });
+
+    try {
+      const accessToken = await acquireGraphToken();
+      const siteId = "fbf1f1d0-319e-4e60-b400-bb5d01994fc8";
+      const listId = "0b47e57e-7525-434c-b6ac-8392118cba0b"; // LeisGenericas List ID
+      const graphEndpoint = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields`;
+
+      const graphResponse = await fetch(graphEndpoint, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!graphResponse.ok) {
+        const errorData = await graphResponse.text();
+        throw new Error(`Erro na API Graph (${graphResponse.status}): ${errorData}`);
+      }
+
+      const data = await graphResponse.json();
+      const spLeis = data.value || [];
+      console.log(`Encontradas ${spLeis.length} leis no SharePoint.`);
+
+      const leisCollectionRef = collection(db, 'leis');
+
+      for (const spItem of spLeis) {
+        const idMigracao = spItem.id; // Use SharePoint item ID as the migration ID
+        if (!idMigracao) {
+            console.warn("Item do SharePoint sem ID, pulando:", spItem.fields);
+            skippedCount++;
+            continue;
+        }
+
+        // Check if already exists in Firebase using ID_Migracao
+        const q = query(leisCollectionRef, where('ID_Migracao', '==', idMigracao));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          // Map SharePoint fields to Firebase structure
+          const firebaseLeiData = {
+            ID_Migracao: idMigracao, // Store the original SharePoint ID
+            ID: spItem.fields?.ID || '',
+            ID_Espelho: spItem.fields?.ID_Espelho || '',
+            ID_Municipio: spItem.fields?.ID_Municipio || '', // This is likely the *linking* ID, not the Municipio list ID
+            Municipio: spItem.fields?.Municipio || '',
+            Num_Lei: Number(spItem.fields?.Num_Lei) || 0,
+            Ano_Lei: Number(spItem.fields?.Ano_Lei) || 0,
+            Mes_Data_Base: spItem.fields?.Mes_Data_Base || '',
+            Indice_Correcao: spItem.fields?.Indice_Correcao || '',
+            Num_Processo: Number(spItem.fields?.Num_Processo) || 0,
+            Ano_Processo: Number(spItem.fields?.Ano_Processo) || 0,
+            Data_Inicial: spItem.fields?.Data_Inicial || '',
+            Data_Final: spItem.fields?.Data_Final || '',
+            Anotacao: spItem.fields?.Anotacao || '',
+            Situacao: spItem.fields?.Situacao || '',
+            Conclusao: spItem.fields?.Conclusao || '',
+            Historico_Atualizacao: spItem.fields?.Historico_Atualizacao || '',
+            Criado_por: spItem.createdBy?.user?.displayName || 'Desconhecido',
+            Modificado: spItem.lastModifiedDateTime ? Timestamp.fromDate(new Date(spItem.lastModifiedDateTime)) : Timestamp.now(),
+            Modificado_por: spItem.lastModifiedBy?.user?.displayName || 'Desconhecido',
+          };
+
+          await addDoc(leisCollectionRef, firebaseLeiData);
+          addedCount++;
+        } else {
+          // console.log(`Lei com ID_Migracao ${idMigracao} já existe no Firebase. Pulando.`);
+          skippedCount++;
+        }
+      }
+
+      const successMsg = `Migração de Leis concluída: ${addedCount} adicionadas, ${skippedCount} já existentes/puladas.`;
+      console.log(successMsg);
+      setMigrationSuccess(successMsg);
+      toast({ title: "Migração de Leis Concluída!", description: successMsg, className: "bg-green-500 text-white" });
+
+    } catch (error: any) {
+      console.error("Erro durante a migração de Leis:", error);
+      setMigrationError(`Erro na migração de Leis: ${error.message}`);
+      toast({ title: "Erro na Migração de Leis", description: error.message, variant: "destructive" });
+    } finally {
+      setIsMigratingLeis(false);
+    }
+  };
+
+  const handleMigrarMunicipios = async () => {
+    setIsMigratingMunicipios(true);
+    setMigrationError(null);
+    setMigrationSuccess(null);
+    let addedCount = 0;
+    let skippedCount = 0;
+    console.log("Iniciando migração de Municípios...");
+    toast({ title: "Iniciando migração de Municípios..." });
+
+    try {
+      const accessToken = await acquireGraphToken();
+      const siteId = "fbf1f1d0-319e-4e60-b400-bb5d01994fc8";
+      const listId = "3eba4d1e-9f82-4fbd-b0a3-f28d212093e1";
+      const graphEndpoint = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${listId}/items?expand=fields`;
+
+      const graphResponse = await fetch(graphEndpoint, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!graphResponse.ok) {
+        const errorData = await graphResponse.text();
+        throw new Error(`Erro na API Graph (${graphResponse.status}): ${errorData}`);
+      }
+
+      const data = await graphResponse.json();
+      const spMunicipios = data.value || [];
+      console.log(`Encontrados ${spMunicipios.length} municípios no SharePoint.`);
+
+      const municipiosCollectionRef = collection(db, 'municipios');
+
+      for (const spItem of spMunicipios) {
+        const idMigracao = spItem.fields?.ID_Municipio; // Use SharePoint field ID_Municipio as the migration ID
+        if (!idMigracao) {
+            console.warn("Item do SharePoint sem ID_Municipio, pulando:", spItem.fields);
+            skippedCount++;
+            continue;
+        }
+
+        // Check if already exists in Firebase using ID_Migracao
+        const q = query(municipiosCollectionRef, where('ID_Migracao', '==', idMigracao));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          // Map SharePoint fields to Firebase structure
+          const firebaseMunicipioData = {
+            ID_Migracao: idMigracao, // Store the original SharePoint ID_Municipio
+            ID_Municipio: spItem.fields?.ID_Municipio || '', // Keep original field name as well
+            Municipio_SICOM: spItem.fields?.Municipio_SICOM || '',
+            Municipio: spItem.fields?.Municipio || '',
+            CNPJ: spItem.fields?.CNPJ || '',
+            ID_IBGE: Number(spItem.fields?.ID_IBGE) || 0,
+            Municipio_IBGE: spItem.fields?.Municipio_IBGE || '',
+            Criado_por: spItem.createdBy?.user?.displayName || 'Desconhecido',
+            Modificado: spItem.lastModifiedDateTime ? Timestamp.fromDate(new Date(spItem.lastModifiedDateTime)) : Timestamp.now(),
+            Modificado_por: spItem.lastModifiedBy?.user?.displayName || 'Desconhecido',
+          };
+
+          await addDoc(municipiosCollectionRef, firebaseMunicipioData);
+          addedCount++;
+        } else {
+          // console.log(`Município com ID_Migracao ${idMigracao} já existe no Firebase. Pulando.`);
+          skippedCount++;
+        }
+      }
+
+      const successMsg = `Migração de Municípios concluída: ${addedCount} adicionados, ${skippedCount} já existentes/pulados.`;
+      console.log(successMsg);
+      setMigrationSuccess(successMsg);
+      toast({ title: "Migração de Municípios Concluída!", description: successMsg, className: "bg-green-500 text-white" });
+
+    } catch (error: any) {
+      console.error("Erro durante a migração de Municípios:", error);
+      setMigrationError(`Erro na migração de Municípios: ${error.message}`);
+      toast({ title: "Erro na Migração de Municípios", description: error.message, variant: "destructive" });
+    } finally {
+      setIsMigratingMunicipios(false);
+    }
+  };
+
 
   return (
     <div className="dashboard-theme container mx-auto py-6 px-4 md:px-6">
@@ -349,6 +560,41 @@ export default function Configuracoes() {
                               </div>
                             )}
                           </div>
+
+                          {/* --- Migração Section --- */}
+                          <div className="rounded-lg border p-4">
+                            <div className="font-medium">Migração de Dados (SharePoint para Firebase)</div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Importar dados iniciais das listas do SharePoint. Verifique se os dados já existem antes de migrar.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={handleMigrarLeis}
+                                  disabled={isMigratingLeis || isMigratingMunicipios}
+                                  className="w-full sm:w-auto"
+                                >
+                                  {isMigratingLeis ? 'Migrando Leis...' : 'Migrar Leis'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={handleMigrarMunicipios}
+                                  disabled={isMigratingLeis || isMigratingMunicipios}
+                                  className="w-full sm:w-auto"
+                                >
+                                  {isMigratingMunicipios ? 'Migrando Municípios...' : 'Migrar Municípios'}
+                                </Button>
+                            </div>
+                             {/* Migration Status Messages */}
+                             {migrationSuccess && (
+                                <p className="mt-4 text-sm text-green-600">{migrationSuccess}</p>
+                             )}
+                             {migrationError && (
+                                <p className="mt-4 text-sm text-red-600">{migrationError}</p>
+                             )}
+                          </div>
+                          {/* --- End Migração Section --- */}
+
                         </>
                       )}
 

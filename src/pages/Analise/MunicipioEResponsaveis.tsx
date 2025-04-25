@@ -4,9 +4,11 @@ import Header from '../../components/Header';
 import Switch from '../../components/Switch';
 import Sidebar from '../../components/Sidebar';
 import Icons from '../../components/Icons';
-import { useMsal, useIsAuthenticated } from "@azure/msal-react";
-import { InteractionRequiredAuthError } from "@azure/msal-browser";
+// Removed useMsal and InteractionRequiredAuthError as Graph API call is removed
+import { useIsAuthenticated } from "@azure/msal-react"; // Keep for auth check if needed elsewhere, or remove if unused
 // import { municipiosGoias } from '../../dados/municipios'; // Remove static import
+import { db } from '../../firebase'; // Import Firestore instance
+import { collection, getDocs, query, orderBy } from 'firebase/firestore'; // Import Firestore functions
 import '../../styles/AppAnalise.css';
 import '../../styles/indexAnalise.css';
 import { useNavigate, useLocation } from 'react-router-dom'; // Removed Link
@@ -66,17 +68,28 @@ interface ExResponsavel {
   dataFim: string | null;
 }
 
+// Interface for Municipio data structure from Firebase
+interface MunicipioData {
+  id: string; // Firebase document ID
+  ID_Municipio: string;
+  ID_IBGE: string;
+  Municipio: string; // Original name from SICOM/SharePoint
+  Municipio_IBGE: string; // Name from IBGE to display
+  // Add other fields if needed later (e.g., CNPJ)
+}
+
+
 const MunicipioEResponsaveis: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-    const { instance, accounts } = useMsal();
-    const isAuthenticated = useIsAuthenticated();
+    // Removed instance, accounts from useMsal()
+    const isAuthenticated = useIsAuthenticated(); // Keep for auth check? Or remove if not needed.
   const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [municipioList, setMunicipioList] = useState<any[]>([]); // State for municipio list
+    const [municipioList, setMunicipioList] = useState<MunicipioData[]>([]); // State for municipio list using new interface
   const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
     const [loadingMunicipios, setLoadingMunicipios] = useState(false); // Loading state for municipios
-  const [apiError, setApiError] = useState<string | null>(null);
-    const [municipioError, setMunicipioError] = useState<string | null>(null); // Error state for municipios
+  const [apiError, setApiError] = useState<string | null>(null); // Keep for Passaporte API errors
+    const [municipioError, setMunicipioError] = useState<string | null>(null); // Error state for municipios fetch
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const lastFetchedMunicipioCodigoRef = useRef<string | null>(null); // Ref to track last fetched municipio
 
@@ -121,7 +134,7 @@ const MunicipioEResponsaveis: React.FC = () => {
   const [chefeRHCamaraInput, setChefeRHCamaraInput] = useState<ResponsavelInput>({ nome: '', cpf: '', incluido: false });
   const [chefeRHPrefeituraInput, setChefeRHPrefeituraInput] = useState<ResponsavelInput>({ nome: '', cpf: '', incluido: false });
 
-    const sharepointListId = "3eba4d1e-9f82-4fbd-b0a3-f28d212093e1"; // ID da lista de municípios no SharePoint
+    // Removed sharepointListId constant
 
   // --- API Fetching Logic ---
   // Modified to accept municipio name explicitly
@@ -286,75 +299,44 @@ const MunicipioEResponsaveis: React.FC = () => {
     }
     }, [setResponsaveis, toast]); // Added toast dependency
 
-    // Function to fetch municipios from SharePoint
+    // Function to fetch municipios from Firebase
     const fetchMunicipios = useCallback(async () => {
         setLoadingMunicipios(true);
         setMunicipioError(null);
         try {
-            if (!isAuthenticated) {
-                console.warn("Not authenticated, cannot fetch municipios.");
-                return;
-            }
+            const municipiosCollectionRef = collection(db, 'municipios');
+            // Order by the display name (Municipio_IBGE)
+            const q = query(municipiosCollectionRef, orderBy('Municipio_IBGE'));
+            const querySnapshot = await getDocs(q);
 
-            const response = await instance
-                .acquireTokenSilent({
-                    scopes: ["Sites.ReadWrite.All"],
-                    account: accounts[0],
-                })
-                .then(async (response) => {
-                    const graphEndpoint = `https://graph.microsoft.com/v1.0/sites/fbf1f1d0-319e-4e60-b400-bb5d01994fc8/lists/${sharepointListId}/items?expand=fields`;
-                    const apiResponse = await fetch(graphEndpoint, {
-                        headers: {
-                            Authorization: `Bearer ${response.accessToken}`,
-                            Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly",
-                        },
-                    });
+            const fetchedMunicipios: MunicipioData[] = querySnapshot.docs.map(doc => ({
+                id: doc.id, // Firebase document ID
+                ...doc.data() as Omit<MunicipioData, 'id'> // Get data and cast
+            }));
 
-                    if (!apiResponse.ok) {
-                        throw new Error(`Erro ao buscar municípios: ${apiResponse.status} ${apiResponse.statusText}`);
-                    }
+            console.log(`Fetched ${fetchedMunicipios.length} municipios from Firebase.`);
+            setMunicipioList(fetchedMunicipios);
 
-                    const apiData = await apiResponse.json();
-                    console.log("GraphAuth: List Items:", apiData.value);
-
-                    const mappedMunicipios = apiData.value.map((item: any) => ({
-                        ID_Municipio: String(item.fields.ID_Municipio), // Use the value from the ID_Municipio field, ensure it's a string
-                        ID_IBGE: String(item.fields.ID_IBGE).replace(/\D/g, ''), // IBGE ID as string, remove non-digits
-                        Municipio: item.fields.Municipio, // Municipality name
-                    }));
-
-                    setMunicipioList(mappedMunicipios);
-                })
-                .catch((error) => {
-                    if (error instanceof InteractionRequiredAuthError) {
-                        // Fallback to interaction when silent call fails
-                        return instance.acquireTokenPopup({
-                            scopes: ["Sites.ReadWrite.All"],
-                        });
-                    } else {
-                        console.error("MSAL error when acquiring token: ", error);
-                        throw error; // Re-throw to be caught by the outer catch
-                    }
-                });
         } catch (error) {
-            console.error("Erro ao buscar lista de municípios:", error);
-            setMunicipioError(error instanceof Error ? error.message : "Erro desconhecido ao buscar municípios.");
+            console.error("Erro ao buscar lista de municípios do Firebase:", error);
+            const errorMsg = error instanceof Error ? error.message : "Erro desconhecido.";
+            setMunicipioError(`Falha ao buscar municípios: ${errorMsg}`);
             toast({
-                title: "Erro de API",
-                description: `Não foi possível buscar a lista de municípios: ${error instanceof Error ? error.message : "Erro desconhecido."}`,
+                title: "Erro ao Carregar Municípios",
+                description: `Não foi possível buscar a lista de municípios do banco de dados: ${errorMsg}`,
                 variant: "destructive",
             });
         } finally {
             setLoadingMunicipios(false);
         }
-    }, [isAuthenticated, instance, accounts, toast]);
+    // Removed MSAL dependencies, keep toast
+    }, [toast]);
 
-    // Effect to fetch municipios on component mount and authentication change
+    // Effect to fetch municipios on component mount
     useEffect(() => {
-        if (isAuthenticated) {
-            fetchMunicipios();
-        }
-    }, [isAuthenticated, fetchMunicipios]);
+        fetchMunicipios();
+    // Only depends on the fetch function itself now
+    }, [fetchMunicipios]);
 
   // Effect to fetch data when municipio changes
   useEffect(() => {
@@ -412,12 +394,13 @@ const MunicipioEResponsaveis: React.FC = () => {
     return anos.reverse();
   };
 
-  const normalizeString = (str: string) => 
+  const normalizeString = (str: string) =>
     str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+    // Filter based on Municipio_IBGE (display name)
     const filteredMunicipios = municipioList.filter(m =>
-    normalizeString(m.Municipio).includes(normalizeString(searchInput))
-  );
+      m.Municipio_IBGE && normalizeString(m.Municipio_IBGE).includes(normalizeString(searchInput))
+    );
 
   // Handles toggling the SWITCH for CURRENT responsibles
   const handleToggleResponsavel = (
@@ -605,7 +588,7 @@ const MunicipioEResponsaveis: React.FC = () => {
 
 
   return (
-    <div className="municipios-theme flex min-h-screen flex-col bg-gray-50">
+    <div className="analise-theme flex min-h-screen flex-col bg-gray-50">
       <div className="min-h-screen bg-gray-50">
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
@@ -650,16 +633,25 @@ const MunicipioEResponsaveis: React.FC = () => {
                       {/* Dropdown for municipio selection */}
                       {searchInput && searchInput !== municipio?.Municipio && filteredMunicipios.length > 0 && !loadingResponsaveis && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {/* Map over filteredMunicipios (which are MunicipioData) */}
                           {filteredMunicipios.map((m) => (
                             <div
-                               key={m.ID_Municipio}
+                               key={m.id} // Use Firebase document ID as key
                               className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
                               onClick={() => {
-                                  setMunicipio({ ID_Municipio: m.ID_Municipio, ID_IBGE: m.ID_IBGE, Municipio: m.Municipio }); // This triggers the useEffect for API call
-                                setSearchInput(m.Municipio); // Update input visually
+                                  // Set context with the selected MunicipioData object
+                                  // Ensure the context expects/handles the full MunicipioData structure if needed,
+                                  // or just the required fields (ID_Municipio, ID_IBGE, Municipio).
+                                  // Assuming context needs the original 'Municipio' name for fetchResponsaveis.
+                                  setMunicipio({
+                                      ID_Municipio: m.ID_Municipio,
+                                      ID_IBGE: m.ID_IBGE,
+                                      Municipio: m.Municipio // Use original name for API call context
+                                  });
+                                  setSearchInput(m.Municipio_IBGE); // Update input visually with the display name
                               }}
                             >
-                              {m.Municipio}
+                              {m.Municipio_IBGE} {/* Display Municipio_IBGE */}
                             </div>
                           ))}
                         </div>

@@ -86,6 +86,11 @@ const Fixacao: React.FC = () => {
   const { numeroProcesso, numeroHabitantes } = useDados(); // Get numeroHabitantes
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // State for table visibility checkboxes
+  const [showLeisInflacionarias, setShowLeisInflacionarias] = useState<boolean>(true); // Default to true?
+  const [showLeisFixacao, setShowLeisFixacao] = useState<boolean>(false);
+  const [showLeisRevisao, setShowLeisRevisao] = useState<boolean>(false);
+
   // State for fetched Firebase data
   const [subsidioDeputadoEstadual, setSubsidioDeputadoEstadual] = useState<SubsidioFirebase | null>(null);
   const [subsidioMinistroSTF, setSubsidioMinistroSTF] = useState<SubsidioFirebase | null>(null);
@@ -478,7 +483,7 @@ const [formData, setFormData] = useState<FormData>({
 
   return (
     // Added Page Wrapper Structure
-    <div className="municipios-theme flex min-h-screen flex-col bg-gray-50">
+    <div className="analise-theme flex min-h-screen flex-col bg-gray-50">
       <div className="min-h-screen bg-gray-50">
         <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
@@ -490,23 +495,24 @@ const [formData, setFormData] = useState<FormData>({
           {/* Use the new BreadcrumbNav component */}
           <BreadcrumbNav currentPage="Fixação" sidebarOpen={sidebarOpen} />
 
-          <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4 ">
+          <main className="min-h-screen bg-pattern bg-gray-100 py-8 px-4">
             <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden ">
               <div className="p-6 ">
-                <div className="mt-[-20px] flex justify-end">
-                      <Icons
-                        onEraseClick={handleErase}
-                        onBackClick={handleBack}
-                        onNextClick={handleNext}
-                        // onSaveClick is omitted as it does nothing yet
-                      />
-                </div>
+                  <div className="mt-[-20px] flex justify-end">
+                        <Icons
+                          onEraseClick={handleErase}
+                          onBackClick={handleBack}
+                          onNextClick={handleNext}
+                          // onSaveClick is omitted as it does nothing yet
+                        />
+                  </div>
 
-                <div className="relative mb-8 text-primary text-center">
-                  <h1 className="text-2xl font-bold text-center mb-4 mt-[-20px]">Fixação {numeroProcesso && `(${numeroProcesso})`}</h1>
-                </div>
+                  <div className="relative mb-8 text-primary text-center">
+                    <h1 className="text-2xl font-bold text-center mb-4 mt-[-20px]">Fixação {numeroProcesso && `(${numeroProcesso})`}</h1>
+                  </div>
+                
 
-                <div className="mb-6 space-y-4">
+                  <div className="mb-6 space-y-4">
                   <div className="flex flex-col md:flex-row gap-4 md:items-center">
                     <Label htmlFor="atoNormativo" className="text-base font-medium w-128">Ato Normativo que concedeu a Fixação dos Subsídios n.:</Label>
                     <Input
@@ -530,203 +536,230 @@ const [formData, setFormData] = useState<FormData>({
                       placeholder="xxxx/xxxx"
                     />
                   </div>
+                </div>              
+
+                <div className="mb-8 w-[80%] md:w-full">
+                  <h2 className="text-xl font-bold mb-4 text-center">Sobre o valor dos subsídios:</h2>
+                  <table className="w-[70%] border-collapse text-center mx-auto">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="w-64 border p-2 text-center">Agente Político</th>
+                        <th className="border p-2 text-center">Valor dos Subsídios</th>
+                        <th className="border p-2 text-center">Válido?</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subsidiosConfig.map((subsidio) => {
+                        const validation = validationResults[subsidio.validationKey] || { isValid: true, message: null };
+                        const hasValue = !!formData[subsidio.valorKey]; // Check if input has a value
+
+                        return (
+                          <tr key={subsidio.validationKey}>
+                            <td className="border p-2 text-left">{subsidio.cargo}</td>
+                            <td className="border-b p-2 flex text-center justify-center">
+                              <Input
+                                type="text"
+                                name={subsidio.valorKey}
+                                value={formData[subsidio.valorKey] || ''}
+                                onChange={(e) => {
+                                  const rawValue = formatCurrency(e.target.value);
+                                  setFormData({ ...formData, [subsidio.valorKey]: rawValue });
+                                }}
+                                className="w-32"
+                                placeholder="R$ 0,00"
+                              />
+                            </td>
+                            <td className="border p-2 w-22">
+                              {/* Only show icon if there's a value */}
+                              {hasValue && (
+                                <div className='flex justify-center items-center gap-1'>
+                                  <VerificationIcon isValid={validation.isValid} />
+                                  {!validation.isValid && validation.message && (
+                                    <TooltipProvider delayDuration={100}>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Info size={16} className="text-red-600 cursor-help" />
+                                        </TooltipTrigger>
+                                        <TooltipContent className="bg-black text-white">
+                                          <p>{validation.message}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
 
-              <div className="mb-8 w-[80%] md:w-full">
-                <h2 className="text-xl font-bold mb-4 text-center">Sobre o valor dos subsídios:</h2>
-                <table className="w-[70%] border-collapse text-center mx-auto">
-                  <thead>
-                    <tr className="bg-gray-100">
-                      <th className="w-64 border p-2 text-center">Agente Político</th>
-                      <th className="border p-2 text-center">Valor dos Subsídios</th>
-                      <th className="border p-2 text-center">Válido?</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {subsidiosConfig.map((subsidio) => {
-                      const validation = validationResults[subsidio.validationKey] || { isValid: true, message: null };
-                      const hasValue = !!formData[subsidio.valorKey]; // Check if input has a value
+                <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-center">
+                  <span className="text-base font-medium">Data da Fixação:</span>
+                  <div className="relative max-w-xs">
+                    <Input
+                      type="date" // Change type to date
+                      name="dataFixacao"
+                      value={formData.dataFixacao}
+                      onChange={handleInputChange}
+                      className="pl-10" // Keep padding for icon if desired, or remove if native date picker icon is sufficient
+                      placeholder="DD/MM/AAAA" // Placeholder might not show for date type
+                    />
+                    <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5 pointer-events-none" /> {/* Make icon non-interactive */}
+                  </div>
+                </div>
+                
+                <div className="mb-4 flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="visualizarInflacionaria"
+                      checked={showLeisInflacionarias}
+                      onCheckedChange={(checked) => setShowLeisInflacionarias(checked as boolean)}
+                    />
+                    <Label htmlFor="visualizarInflacionaria" className="text-sm font-medium text-gray-700">Visualizar Leis de Política Inflacionária</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="visualizarFixacao"
+                      checked={showLeisFixacao}
+                      onCheckedChange={(checked) => setShowLeisFixacao(checked as boolean)}
+                    />
+                    <Label htmlFor="visualizarFixacao" className="text-sm font-medium text-gray-700">Visualizar Leis de Fixação</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="visualizarRevisao"
+                      checked={showLeisRevisao}
+                      onCheckedChange={(checked) => setShowLeisRevisao(checked as boolean)}
+                    />
+                    <Label htmlFor="visualizarRevisao" className="text-sm font-medium text-gray-700">Visualizar Leis de Revisão Geral Anual</Label>
+                  </div>
+                </div>
+
+                <div className="mb-6 flex items-center gap-2 border p-4 rounded bg-blue-50">
+                  <Checkbox 
+                    id="anotacao" 
+                    checked={formData.anotacaoPlanilha} 
+                    onCheckedChange={(checked) => handleCheckboxChange('anotacaoPlanilha', !!checked)} 
+                  />
+                  <label htmlFor="anotacao" className="text-blue-800 font-medium">Anotação na planilha de controle de gastos</label>
+                </div>
+
+                {/* Conditional rendering for the annotation text block */}
+                {formData.anotacaoPlanilha && (
+                  <div className="mb-8 p-4 border rounded-md bg-gray-50 text-sm">
+                    <p className="mb-2">Trata-se de procedimento de anotação, para fins de controle de gastos, da Lei nº
+                      <Input
+                        name="numeroLei"
+                      value={formData.numeroLei} 
+                      onChange={handleInputChange} 
+                      className="inline-block w-24 mx-1" 
+                      placeholder="000/000" 
+                    /> que que fixou os subsídios dos agentes políticos de MUNICÍPIO para a legislatura <span className="bg-white border px-2 py-0.5 rounded">2020-2024</span> do Setor de Recursos, com a informação de que os dados da planilha de subsídios 
+                    <span className="bg-white border px-2 py-0.5 rounded mx-1">2020-2023</span> foram atualizados em consonância com o disposto no Acórdão nº
+                    <Input 
+                      name="numeroAcordao" 
+                      value={formData.numeroAcordao} 
+                      onChange={handleInputChange} 
+                      className="inline-block w-24 mx-1" 
+                      placeholder="000/000" 
+                    />.
+                  </p>
+                </div>
+                )} {/* Correctly close the conditional block here */}
+
+                <div className="mb-8">
+                  <h2 className="text-lg font-bold mb-4">Vícios ou Ressalvas da Fixação de Subsídios:</h2>
+
+                  <div className="space-y-4"> {/* Increased spacing */}
+                    {vicios.map((vicio, index) => {
+                      const vicioKey = `vicio-${index}`;
+                      const isChecked = formData.viciosChecks[vicioKey] || false;
+                      const details = formData.viciosDetails[vicioKey] || { inputValue: '', ressalvaAV: false };
+
+                      // Determine if an input is needed for this index
+                      const needsInput = [0, 3, 5, 6, 7, 9].includes(index);
+                      // Define placeholder based on index
+                      let inputPlaceholder = '';
+                      switch (index) {
+                        case 0: inputPlaceholder = "Descreva a documentação ausente"; break;
+                        case 3: inputPlaceholder = "Número da Lei"; break;
+                        case 5: inputPlaceholder = "Qual(is) cargo(s) excedeu(eram) ao teto"; break;
+                        case 6: inputPlaceholder = "Data da eleição"; break;
+                        case 7: inputPlaceholder = "Art. e Lei alterados"; break;
+                        case 9: inputPlaceholder = "Descreva a divergência"; break;
+                        default: inputPlaceholder = "Detalhes"; // Default placeholder
+                      }
+
 
                       return (
-                        <tr key={subsidio.validationKey}>
-                          <td className="border p-2 text-left">{subsidio.cargo}</td>
-                          <td className="border-b p-2 flex text-center justify-center">
-                            <Input
-                              type="text"
-                              name={subsidio.valorKey}
-                              value={formData[subsidio.valorKey] || ''}
-                              onChange={(e) => {
-                                const rawValue = formatCurrency(e.target.value);
-                                setFormData({ ...formData, [subsidio.valorKey]: rawValue });
-                              }}
-                              className="w-32"
-                              placeholder="R$ 0,00"
+                        <div key={index} className="p-3 border rounded-md bg-gray-50"> {/* Added padding and border */}
+                          <div className="flex items-center space-x-2 mb-2"> {/* Margin bottom for spacing */}
+                            <Checkbox
+                              id={vicioKey}
+                              checked={isChecked}
+                              onCheckedChange={(checked) => handleVicioCheckboxChange(index, !!checked)}
                             />
-                          </td>
-                          <td className="border p-2 w-22">
-                            {/* Only show icon if there's a value */}
-                            {hasValue && (
-                              <div className='flex justify-center items-center gap-1'>
-                                <VerificationIcon isValid={validation.isValid} />
-                                {!validation.isValid && validation.message && (
-                                  <TooltipProvider delayDuration={100}>
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Info size={16} className="text-red-600 cursor-help" />
-                                      </TooltipTrigger>
-                                      <TooltipContent className="bg-black text-white">
-                                        <p>{validation.message}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
+                            <Label htmlFor={vicioKey} className="text-base font-normal">{vicio}</Label>
+                          </div>
+
+                          {/* Conditional rendering for input and switch */}
+                          {isChecked && (
+                            <div className="pl-6 mt-2 space-y-2"> {/* Indent and space out conditional elements */}
+                              {needsInput && (
+                                <div className="flex items-center gap-2">
+                                  <Label htmlFor={`${vicioKey}-input`} className="text-sm whitespace-nowrap">{inputPlaceholder}:</Label>
+                                  <Input
+                                    id={`${vicioKey}-input`}
+                                    value={details.inputValue || ''}
+                                    onChange={(e) => handleVicioInputChange(index, e.target.value)}
+                                    placeholder={inputPlaceholder}
+                                    className="flex-grow"
+                                    type={index === 6 ? "date" : "text"} // Set type to "date" specifically for index 6
+                                  />
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                {/* Label for the "Ressalva" state (when switch is off) */}
+                                <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${!(details.ressalvaAV || false) ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
+                                  Ressalva
+                                </Label>
+                                <Switch
+                                  id={`${vicioKey}-switch`}
+                                  checked={details.ressalvaAV || false} // true = A/V, false = Ressalva
+                                  onCheckedChange={(checked) => handleVicioSwitchChange(index, checked)}
+                                />
+                                {/* Label for the "A/V" state (when switch is on) */}
+                                <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${(details.ressalvaAV || false) ? 'font-semibold text-green-600' : 'text-gray-500'}`}>
+                                  A/V
+                                </Label>
                               </div>
-                            )}
-                          </td>
-                        </tr>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-center">
-                <span className="text-base font-medium">Data da Fixação:</span>
-                <div className="relative max-w-xs">
-                  <Input
-                    type="date" // Change type to date
-                    name="dataFixacao"
-                    value={formData.dataFixacao}
-                    onChange={handleInputChange}
-                    className="pl-10" // Keep padding for icon if desired, or remove if native date picker icon is sufficient
-                    placeholder="DD/MM/AAAA" // Placeholder might not show for date type
-                  />
-                  <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5 pointer-events-none" /> {/* Make icon non-interactive */}
+                  </div>
                 </div>
-              </div>
+                {formData.ressalvaLivre && (
+                  <div className="mb-8">
+                    <h3 className="font-medium mb-2">Ressalva</h3>
+                    <Textarea className="w-full h-32" />
+                  </div>
+                )}
 
-              <div className="mb-6 flex items-center gap-2 border p-4 rounded bg-blue-50">
-                <Checkbox 
-                  id="anotacao" 
-                  checked={formData.anotacaoPlanilha} 
-                  onCheckedChange={(checked) => handleCheckboxChange('anotacaoPlanilha', !!checked)} 
-                />
-                <label htmlFor="anotacao" className="text-blue-800 font-medium">Anotação na planilha de controle de gastos</label>
-              </div>
-
-              {/* Conditional rendering for the annotation text block */}
-              {formData.anotacaoPlanilha && (
-                <div className="mb-8 p-4 border rounded-md bg-gray-50 text-sm">
-                  <p className="mb-2">Trata-se de procedimento de anotação, para fins de controle de gastos, da Lei nº
-                    <Input
-                      name="numeroLei"
-                    value={formData.numeroLei} 
-                    onChange={handleInputChange} 
-                    className="inline-block w-24 mx-1" 
-                    placeholder="000/000" 
-                  /> que que fixou os subsídios dos agentes políticos de MUNICÍPIO para a legislatura <span className="bg-white border px-2 py-0.5 rounded">2020-2024</span> do Setor de Recursos, com a informação de que os dados da planilha de subsídios 
-                  <span className="bg-white border px-2 py-0.5 rounded mx-1">2020-2023</span> foram atualizados em consonância com o disposto no Acórdão nº
-                  <Input 
-                    name="numeroAcordao" 
-                    value={formData.numeroAcordao} 
-                    onChange={handleInputChange} 
-                    className="inline-block w-24 mx-1" 
-                    placeholder="000/000" 
-                  />.
-                </p>
-              </div>
-              )} {/* Correctly close the conditional block here */}
-
-              <div className="mb-8">
-                <h2 className="text-lg font-bold mb-4">Vícios ou Ressalvas da Fixação de Subsídios:</h2>
-
-                <div className="space-y-4"> {/* Increased spacing */}
-                  {vicios.map((vicio, index) => {
-                    const vicioKey = `vicio-${index}`;
-                    const isChecked = formData.viciosChecks[vicioKey] || false;
-                    const details = formData.viciosDetails[vicioKey] || { inputValue: '', ressalvaAV: false };
-
-                    // Determine if an input is needed for this index
-                    const needsInput = [0, 3, 5, 6, 7, 9].includes(index);
-                    // Define placeholder based on index
-                    let inputPlaceholder = '';
-                    switch (index) {
-                      case 0: inputPlaceholder = "Descreva a documentação ausente"; break;
-                      case 3: inputPlaceholder = "Número da Lei"; break;
-                      case 5: inputPlaceholder = "Qual(is) cargo(s) excedeu(eram) ao teto"; break;
-                      case 6: inputPlaceholder = "Data da eleição"; break;
-                      case 7: inputPlaceholder = "Art. e Lei alterados"; break;
-                      case 9: inputPlaceholder = "Descreva a divergência"; break;
-                      default: inputPlaceholder = "Detalhes"; // Default placeholder
-                    }
-
-
-                    return (
-                      <div key={index} className="p-3 border rounded-md bg-gray-50"> {/* Added padding and border */}
-                        <div className="flex items-center space-x-2 mb-2"> {/* Margin bottom for spacing */}
-                          <Checkbox
-                            id={vicioKey}
-                            checked={isChecked}
-                            onCheckedChange={(checked) => handleVicioCheckboxChange(index, !!checked)}
-                          />
-                          <Label htmlFor={vicioKey} className="text-base font-normal">{vicio}</Label>
-                        </div>
-
-                        {/* Conditional rendering for input and switch */}
-                        {isChecked && (
-                          <div className="pl-6 mt-2 space-y-2"> {/* Indent and space out conditional elements */}
-                            {needsInput && (
-                              <div className="flex items-center gap-2">
-                                <Label htmlFor={`${vicioKey}-input`} className="text-sm whitespace-nowrap">{inputPlaceholder}:</Label>
-                                <Input
-                                  id={`${vicioKey}-input`}
-                                  value={details.inputValue || ''}
-                                  onChange={(e) => handleVicioInputChange(index, e.target.value)}
-                                  placeholder={inputPlaceholder}
-                                  className="flex-grow"
-                                  type={index === 6 ? "date" : "text"} // Set type to "date" specifically for index 6
-                                />
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2">
-                               {/* Label for the "Ressalva" state (when switch is off) */}
-                               <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${!(details.ressalvaAV || false) ? 'font-semibold text-blue-600' : 'text-gray-500'}`}>
-                                 Ressalva
-                               </Label>
-                               <Switch
-                                id={`${vicioKey}-switch`}
-                                checked={details.ressalvaAV || false} // true = A/V, false = Ressalva
-                                onCheckedChange={(checked) => handleVicioSwitchChange(index, checked)}
-                              />
-                              {/* Label for the "A/V" state (when switch is on) */}
-                              <Label htmlFor={`${vicioKey}-switch`} className={`text-sm ${(details.ressalvaAV || false) ? 'font-semibold text-green-600' : 'text-gray-500'}`}>
-                                A/V
-                              </Label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {formData.ressalvaLivre && (
                 <div className="mb-8">
-                  <h3 className="font-medium mb-2">Ressalva</h3>
-                  <Textarea className="w-full h-32" />
+                  <h2 className="text-lg font-semibold mb-4">Conferência do Texto de Fixação de Subsídios</h2>
+                  <div className="border rounded-md w-full h-64"></div>
                 </div>
-              )}
-
-              <div className="mb-8">
-                <h2 className="text-lg font-semibold mb-4">Conferência do Texto de Fixação de Subsídios</h2>
-                <div className="border rounded-md w-full h-64"></div>
               </div>
-              </div> {/* Add missing closing tag for the p-6 div */}
-            </div> {/* Closing tag for max-w-5xl div */}
+            </div>
           </main>
-        </div> {/* Closing tag for ml-0/ml-64 div */}
-      </div> {/* Closing tag for min-h-screen bg-gray-50 div */}
-    </div> // Closing tag for municipios-theme div
+        </div>
+      </div>
+    </div>
   );
 };
 

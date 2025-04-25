@@ -11,7 +11,7 @@ import {
 import { cn } from "@/components/ui/lib/utils"; // Import cn utility
 
 // Define the possible steps in the analysis process
-type AnaliseStep = 'Município e Responsáveis' | 'Tratamento Leis' | 'Fixação';
+type AnaliseStep = 'Município e Responsáveis' | 'Tratamento Processo' | 'Fixação';
 
 // Props for the BreadcrumbNav component
 interface BreadcrumbNavProps {
@@ -24,7 +24,7 @@ interface BreadcrumbNavProps {
 // Define the sequence and paths for the analysis steps
 const analysisSteps: { name: AnaliseStep; path: string }[] = [
   { name: 'Município e Responsáveis', path: '/MunicipioEResponsaveis' },
-  { name: 'Tratamento Leis', path: '/TratamentoLeis' },
+  { name: 'Tratamento Processo', path: '/TratamentoLeis' },
   { name: 'Fixação', path: '/Fixacao' },
 ];
 
