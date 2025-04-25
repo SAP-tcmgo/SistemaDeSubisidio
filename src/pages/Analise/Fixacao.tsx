@@ -165,7 +165,7 @@ const Fixacao: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // State for table visibility checkboxes
-  const [showLeisInflacionarias, setShowLeisInflacionarias] = useState<boolean>(true); // Default to true
+  const [showLeisInflacionarias, setShowLeisInflacionarias] = useState<boolean>(false); // Default to true
   const [showLeisFixacao, setShowLeisFixacao] = useState<boolean>(false);
   const [showLeisRevisao, setShowLeisRevisao] = useState<boolean>(false);
 
@@ -825,19 +825,17 @@ const [formData, setFormData] = useState<FormData>({
                                 <TableCell className="border px-2 py-1 text-center">{formatDate(lei.Data_Inicial)}</TableCell>
                                 <TableCell className="border px-2 py-1 text-center">{formatDate(lei.Data_Final)}</TableCell>
                                 <TableCell className="border px-2 py-1 text-center">
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedLawDetail(lei);
-                                        setIsLawDetailOpen(true); // Open dialog
-                                      }}
-                                      className="text-blue-600 hover:text-blue-800"
-                                    >
-                                      <PlusCircle className="h-4 w-4" />
-                                    </Button>
-                                  </DialogTrigger>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedLawDetail(lei);
+                                      setIsLawDetailOpen(true); // Open dialog
+                                    }}
+                                    className="text-blue-600 hover:text-blue-800"
+                                  >
+                                    <PlusCircle className="h-4 w-4" />
+                                  </Button>
                                 </TableCell>
                               </TableRow>
                             ))
@@ -877,7 +875,7 @@ const [formData, setFormData] = useState<FormData>({
                         {/* Data will be added later */}
                         <TableRow>
                           <TableCell colSpan={8} className="border px-2 py-1 text-center text-gray-500">
-                            Nenhuma lei de fixação encontrada (funcionalidade futura).
+                            Nenhuma lei de fixação encontrada.
                           </TableCell>
                         </TableRow>
                       </TableBody>
@@ -908,7 +906,7 @@ const [formData, setFormData] = useState<FormData>({
                         {/* Data will be added later */}
                         <TableRow>
                           <TableCell colSpan={8} className="border px-2 py-1 text-center text-gray-500">
-                            Nenhuma lei de revisão geral anual encontrada (funcionalidade futura).
+                            Nenhuma lei de revisão geral anual encontrada.
                           </TableCell>
                         </TableRow>
                       </TableBody>
