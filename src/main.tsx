@@ -28,9 +28,6 @@ const initializeAndRender = async () => {
     await msalInstance.initialize();
     console.log("MSAL Initialized Successfully"); // Add log for confirmation
 
-    // No need to handle redirect promise for popup flow
-    // await msalInstance.handleRedirectPromise(); // REMOVED
-
     // Render the main app ONLY after successful initialization
     root.render(
       <React.StrictMode> {/* Recommended for development */}
@@ -41,12 +38,9 @@ const initializeAndRender = async () => {
     );
   } catch (error) {
     console.error("MSAL initialization error:", error); // Updated error message
-    console.error("MSAL initialization error:", error); // Updated error message
-    // Optionally render an error message to the user
     root.render(
       <div>
-        <h1>Authentication Initialization Error</h1>
-        <p>Failed to initialize authentication. Please try again later.</p> {/* Updated message */}
+        <h1>Erro de autenticação no MSAL.</h1>
         <pre>{error instanceof Error ? error.toString() : String(error)}</pre>
       </div>
     );

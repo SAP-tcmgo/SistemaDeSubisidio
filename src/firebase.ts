@@ -18,7 +18,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCsFTpa3BjOUl7l3pBmmpnT7-q1w8OS4xY",
   authDomain: "siaap-subsidios.firebaseapp.com",
   projectId: "siaap-subsidios",
-  storageBucket: "siaap-subsidios.appspot.com", // Fixed typo in storage bucket URL
+  storageBucket: "siaap-subsidios.appspot.com",
   messagingSenderId: "567063169065",
   appId: "1:567063169065:web:b80c4285e34d527c1cb438"
 };

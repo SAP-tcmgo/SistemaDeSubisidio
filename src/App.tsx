@@ -7,8 +7,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { UserProvider } from "./Contexts/UserContext";
 import { DadosProvider } from './Contexts/DadosContext'; // Importe o contexto
 
-
-// Lazy load page components
 const LoginPage = lazy(() => import("./pages/Login/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/Login/RegisterPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -19,7 +17,9 @@ const DadosMunicipioEResponsaveis = lazy(() => import("./pages/Analise/Municipio
 const TratamentoProcesso = lazy(() => import("./pages/Analise/TratamentoProcesso"));
 const Fixacao = lazy(() => import("./pages/Analise/Fixacao"));
 const CadastroADM = lazy(() => import("./pages/CadastroADM"))
+const ConsultaAnotacao = lazy(() => import("./pages/ConsultaAnotacao"))
 const GraphAuth = lazy(() => import("./pages/Projetos"))
+const PosAcordao = lazy(() => import("./pages/Analise/PosAcordao"))
 
 const queryClient = new QueryClient();
 
@@ -48,6 +48,8 @@ const App = () => {
                                     <Route path="/Fixacao" element={<Fixacao />} />
                                     <Route path="/CadastroADM" element={<CadastroADM />} />
                                     <Route path="/Projetos" element={<GraphAuth />} />
+                                    <Route path="/PosAcordao" element={<PosAcordao />} />
+                                    <Route path="/ConsultaAnotacao" element={<ConsultaAnotacao />} />
                                     <Route path="*" element={<NotFound />} />
                                 </Routes>
                             </Suspense>

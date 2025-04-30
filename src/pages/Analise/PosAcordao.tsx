@@ -103,7 +103,6 @@ const Fixacao: React.FC = () => {
   interface FormData {
   atoNormativo: string;
   legislatura: string;
-  dataFixacao: string;
   anotacaoPlanilha: boolean;
   numeroLei: string;
   numeroAcordao: string;
@@ -114,7 +113,6 @@ const Fixacao: React.FC = () => {
 const [formData, setFormData] = useState<FormData>({
     atoNormativo: '',
     legislatura: '',
-    dataFixacao: '',
     anotacaoPlanilha: false,
     numeroLei: '',
     numeroAcordao: '',
@@ -183,7 +181,6 @@ const [formData, setFormData] = useState<FormData>({
      setFormData({
        atoNormativo: '',
        legislatura: '',
-       dataFixacao: '',
        anotacaoPlanilha: true,
        numeroLei: '',
        numeroAcordao: '',
@@ -480,17 +477,16 @@ const [formData, setFormData] = useState<FormData>({
               </div>
 
               <div className="mb-6 flex flex-col md:flex-row gap-4 md:items-center">
-                <span className="text-base font-medium">Data da Fixação:</span>
+                <span className="text-base font-medium">Número do Acórdão:</span>
                 <div className="relative max-w-xs">
                   <Input
-                    type="date" // Change type to date
-                    name="dataFixacao"
-                    value={formData.dataFixacao}
+                    type="string" // Change type to date
+                    name="NumeroAcordao"
+                    className="w-[100px] md:max-w-xs"
+                    value={formData.NumeroAcordao}
                     onChange={handleInputChange}
-                    className="pl-10" // Keep padding for icon if desired, or remove if native date picker icon is sufficient
-                    placeholder="DD/MM/AAAA" // Placeholder might not show for date type
+                    placeholder="xxxx/xx" // Placeholder might not show for date type
                   />
-                  <Calendar className="absolute left-3 top-2.5 text-gray-500 h-5 w-5 pointer-events-none" /> {/* Make icon non-interactive */}
                 </div>
               </div>
 

@@ -42,21 +42,12 @@ const TratamentoProcesso: React.FC = () => { // Renamed component conceptually
     numeroProcesso
   } = useDados();
 
-  // Removed leisInflacionarias state
-  // Removed isLoadingLeisInflacionarias state
-  // Removed fetchErrorLeisInflacionarias state
-
-  // Removed isViewAllDialogOpen state
-  // Removed isViewIncludedDialogOpen state
-
-
-  // Fetch population (existing useEffect - keep as is)
   useEffect(() => {
     const ApiPopulacao = async () => {
       if (municipio && municipio.ID_IBGE) { // Use ID_IBGE
         try {
           const response = await axios.get(
-            `https://apisidra.ibge.gov.br/values/t/4714/n6/${municipio.ID_IBGE}/v/93/p/2022` // Use ID_IBGE
+            `https://apisidra.ibge.gov.br/values/t/6579/n6/${municipio.ID_IBGE}/v/9324/p/last` // Use ID_IBGE
           );
           const populationData = response.data[1];
           const population = populationData?.V || '0';
@@ -76,15 +67,6 @@ const TratamentoProcesso: React.FC = () => { // Renamed component conceptually
     ApiPopulacao();
   }, [municipio?.ID_IBGE, setNumeroHabitantes, municipio]); // Use ID_IBGE in dependency array
 
-  // Removed useEffect hook for setting user
-  // Removed useEffect hook for fetching laws from SharePoint
-
-
-  // Removed handleToggleIncluirLei handler
-  // Removed handleEditFromViewAll handler
-
-
-  // --- Rest of the component logic (keep toggleSidebar, handleTratamentoCheckboxChange, etc.) ---
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -159,7 +141,7 @@ const TratamentoProcesso: React.FC = () => { // Renamed component conceptually
                       />
                 </div>
                 <div className="relative mb-8 text-primary text-center">
-                  <h1 className="text-2xl font-bold mt-[-20px]">Trata-se de {numeroProcesso && `(${numeroProcesso})`}</h1>
+                  <h1 className="text-2xl font-bold mt-[-20px]">Trata-se de Processo de Subsídio {numeroProcesso && `(${numeroProcesso})`}</h1>
                 </div>
 
                 {/* Keep Checkboxes */}
